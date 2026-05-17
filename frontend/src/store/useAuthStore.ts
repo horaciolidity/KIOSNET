@@ -6,6 +6,9 @@ interface User {
   email: string;
   name: string;
   role: 'ADMIN' | 'EMPLOYEE';
+  tenantId: string;
+  plan: string;
+  subActive: boolean;
 }
 
 interface AuthState {
@@ -13,6 +16,7 @@ interface AuthState {
   token: string | null;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
+  setSubscriptionActive: (active: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -22,9 +26,19 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       setAuth: (user, token) => set({ user, token }),
       logout: () => set({ user: null, token: null }),
+      setSubscriptionActive: (active) => set((state) => {
+        if (!state.user) return state;
+        return {
+          user: {
+            ...state.user,
+            subActive: active
+          }
+        };
+      })
     }),
     {
       name: 'auth-storage',
     }
   )
 );
+

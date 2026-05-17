@@ -15,6 +15,7 @@ import { useAuthStore } from './store/useAuthStore';
 import { useInventoryStore } from './store/useInventoryStore';
 import { useCustomerStore } from './store/useCustomerStore';
 import { useCashStore } from './store/useCashStore';
+import SubscriptionPay from './components/subscription/SubscriptionPay';
 
 const App: React.FC = () => {
   const { user } = useAuthStore();
@@ -23,7 +24,7 @@ const App: React.FC = () => {
   const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
 
   React.useEffect(() => {
-    if (user) {
+    if (user && user.subActive) {
       fetchProducts();
       fetchCustomers();
       fetchActiveSession();
@@ -32,9 +33,15 @@ const App: React.FC = () => {
 
   const isEmployee = user?.role === 'EMPLOYEE';
 
+  // SaaS Multitenant billing blocker
+  if (user && !user.subActive) {
+    return <SubscriptionPay />;
+  }
+
   return (
     <Router>
       <Routes>
+
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
         
         <Route 

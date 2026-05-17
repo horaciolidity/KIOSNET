@@ -34,42 +34,72 @@ enum RegisterStatus {
   CLOSED
 }
 
+model Tenant {
+  id           String         @id @default(uuid())
+  name         String         // Store name
+  address      String?
+  phone        String?
+  taxId        String?
+  email        String?
+  plan         String         @default("FREE") // FREE, PRO, PREMIUM
+  subActive    Boolean        @default(false)  // Multi-user SaaS subscription flag
+  users        User[]
+  products     Product[]
+  categories   Category[]
+  customers    Customer[]
+  sales        Sale[]
+  registers    CashRegister[]
+  settings     Setting[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String         @id @default(uuid())
+  email     String         @unique
   password  String
   name      String
-  role      Role     @default(EMPLOYEE)
-  active    Boolean  @default(true)
+  role      Role           @default(EMPLOYEE)
+  active    Boolean        @default(true)
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
   sales     Sale[]
   registers CashRegister[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 }
 
 model Category {
   id       String    @id @default(uuid())
-  name     String    @unique
+  name     String
+  tenantId String
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
   products Product[]
+
+  @@unique([tenantId, name])
 }
 
 model Product {
   id           String     @id @default(uuid())
   name         String
-  barcode      String?    @unique
+  barcode      String?
   description  String?
   categoryId   String
   category     Category   @relation(fields: [categoryId], references: [id])
-  unit         String     @default("UNIDAD") // UNIDAD, LITRO, KILO
+  unit         String     @default("UNIDAD")
   costPrice    Float
   sellingPrice Float
   stock        Float      @default(0)
   minStock     Float      @default(5)
   image        String?
   active       Boolean    @default(true)
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
   items        SaleItem[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+
+  @@unique([tenantId, barcode])
 }
 
 model Customer {
@@ -79,6 +109,8 @@ model Customer {
   address     String?
   creditLimit Float    @default(0)
   balance     Float    @default(0)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   sales       Sale[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -95,6 +127,8 @@ model Sale {
   customer      Customer?     @relation(fields: [customerId], references: [id])
   sellerId      String
   seller        User          @relation(fields: [sellerId], references: [id])
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
   items         SaleItem[]
   receivedAmount Float?
   changeAmount   Float?
@@ -117,6 +151,8 @@ model CashRegister {
   id             String         @id @default(uuid())
   userId         String
   user           User           @relation(fields: [userId], references: [id])
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
   openingBalance Float
   closingBalance Float?
   status         RegisterStatus @default(OPEN)
@@ -137,16 +173,20 @@ model CashMovement {
 }
 
 model Setting {
-  id    String @id @default(uuid())
-  key   String @unique
-  value String
+  id       String @id @default(uuid())
+  key      String
+  value    String
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
 }
 
 model Notification {
   id        String   @id @default(uuid())
   title     String
   message   String
-  type      String   @default("info") // info, warning, success, error
+  type      String   @default("info")
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 }

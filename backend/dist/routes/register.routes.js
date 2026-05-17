@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const register_controller_1 = require("../controllers/register.controller");
+const router = (0, express_1.Router)();
+router.post('/open', register_controller_1.openRegister);
+router.patch('/:id/close', register_controller_1.closeRegister);
+router.get('/:id/movements', register_controller_1.getMovements);
+router.post('/movements', register_controller_1.addMovement);
+router.get('/active/:userId', register_controller_1.getActiveRegister);
+exports.default = router;

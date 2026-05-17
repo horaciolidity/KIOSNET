@@ -6,72 +6,79 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  // 1. Create Initial Users
+  // 1. Create a Default Demo Tenant (Comercio)
+  console.log('🏢 Creating demo tenant...');
+  const tenant = await prisma.tenant.create({
+    data: {
+      name: 'Comercio Demostrativo',
+      plan: 'PRO',
+      subActive: true, // Mark active for demo testing
+      address: 'Av. Corrientes 1234, CABA',
+      phone: '+54 9 11 1234-5678',
+      taxId: '20-12345678-9',
+      email: 'demo@kiosnet.com'
+    }
+  });
+  console.log(`✅ Demo tenant created with ID: ${tenant.id}`);
+
+  // 2. Create Initial Users tied to this Tenant
   console.log('👤 Creating initial users...');
-  
   const adminPassword = await bcrypt.hash('admin123', 10);
   const employeePassword = await bcrypt.hash('empleado123', 10);
 
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@pos.com' },
-    update: {},
-    create: {
+  const admin = await prisma.user.create({
+    data: {
       email: 'admin@pos.com',
       name: 'Administrador',
       password: adminPassword,
       role: 'ADMIN',
       active: true,
+      tenantId: tenant.id
     },
   });
-  console.log(`✅ Admin user created/verified: ${admin.email}`);
+  console.log(`✅ Admin user created: ${admin.email}`);
 
-  const employee = await prisma.user.upsert({
-    where: { email: 'empleado@pos.com' },
-    update: {},
-    create: {
+  const employee = await prisma.user.create({
+    data: {
       email: 'empleado@pos.com',
       name: 'Cajero / Empleado',
       password: employeePassword,
       role: 'EMPLOYEE',
       active: true,
+      tenantId: tenant.id
     },
   });
-  console.log(`✅ Employee user created/verified: ${employee.email}`);
+  console.log(`✅ Employee user created: ${employee.email}`);
 
-  // 2. Create Categories
+  // 3. Create Categories
   console.log('📦 Creating product categories...');
   const categories = [
-    { name: 'Bebidas' },
-    { name: 'Panadería' },
-    { name: 'Lácteos' },
-    { name: 'Cigarrillos' },
-    { name: 'Fiambrería' },
-    { name: 'Otros' },
+    { name: 'Bebidas', tenantId: tenant.id },
+    { name: 'Panadería', tenantId: tenant.id },
+    { name: 'Lácteos', tenantId: tenant.id },
+    { name: 'Cigarrillos', tenantId: tenant.id },
+    { name: 'Fiambrería', tenantId: tenant.id },
+    { name: 'Otros', tenantId: tenant.id },
   ];
 
   const dbCategories = [];
   for (const cat of categories) {
-    const category = await prisma.category.upsert({
-      where: { name: cat.name },
-      update: {},
-      create: cat,
+    const category = await prisma.category.create({
+      data: cat
     });
     dbCategories.push(category);
-    console.log(`✅ Category created/verified: ${category.name}`);
+    console.log(`✅ Category created: ${category.name}`);
   }
 
-  // 3. Create Sample Products
+  // 4. Create Sample Products
   console.log('🏷️ Creating sample products...');
-  
   const beverages = dbCategories.find(c => c.name === 'Bebidas');
   const bakery = dbCategories.find(c => c.name === 'Panadería');
   const dairy = dbCategories.find(c => c.name === 'Lácteos');
 
   if (beverages) {
-    await prisma.product.upsert({
-      where: { barcode: '779007041853' },
-      update: {},
-      create: {
+    await prisma.product.create({
+      data: {
         name: 'Coca Cola 1.5L',
         barcode: '779007041853',
         description: 'Bebida gaseosa refrescante sabor original',
@@ -82,13 +89,12 @@ async function main() {
         stock: 50,
         minStock: 10,
         active: true,
+        tenantId: tenant.id
       },
     });
     
-    await prisma.product.upsert({
-      where: { barcode: '779007041854' },
-      update: {},
-      create: {
+    await prisma.product.create({
+      data: {
         name: 'Agua Mineral Villavicencio 2L',
         barcode: '779007041854',
         description: 'Agua mineral natural de manantial',
@@ -99,15 +105,14 @@ async function main() {
         stock: 30,
         minStock: 8,
         active: true,
+        tenantId: tenant.id
       },
     });
   }
 
   if (bakery) {
-    await prisma.product.upsert({
-      where: { barcode: '779006020584' },
-      update: {},
-      create: {
+    await prisma.product.create({
+      data: {
         name: 'Pan Lactal Bimbo Grande',
         barcode: '779006020584',
         description: 'Pan de mesa lactal familiar',
@@ -118,15 +123,14 @@ async function main() {
         stock: 15,
         minStock: 5,
         active: true,
+        tenantId: tenant.id
       },
     });
   }
 
   if (dairy) {
-    await prisma.product.upsert({
-      where: { barcode: '779008002634' },
-      update: {},
-      create: {
+    await prisma.product.create({
+      data: {
         name: 'Leche La Serenísima 1L',
         barcode: '779008002634',
         description: 'Leche entera ultrapasteurizada',
@@ -137,28 +141,27 @@ async function main() {
         stock: 25,
         minStock: 10,
         active: true,
+        tenantId: tenant.id
       },
     });
   }
 
-  // 4. Create default Settings
+  // 5. Create default Settings
   console.log('⚙️ Creating default settings...');
   const settings = [
-    { key: 'business_name', value: 'KIOSNET POS' },
-    { key: 'business_address', value: 'Av. Corrientes 1234, CABA' },
-    { key: 'business_phone', value: '+54 9 11 1234-5678' },
-    { key: 'business_cuit', value: '20-12345678-9' },
-    { key: 'business_currency', value: 'ARS' },
+    { key: 'business_name', value: 'Comercio Demostrativo', tenantId: tenant.id },
+    { key: 'business_address', value: 'Av. Corrientes 1234, CABA', tenantId: tenant.id },
+    { key: 'business_phone', value: '+54 9 11 1234-5678', tenantId: tenant.id },
+    { key: 'business_tax_id', value: '20-12345678-9', tenantId: tenant.id },
+    { key: 'mercado_pago_active', value: 'false', tenantId: tenant.id },
   ];
 
   for (const set of settings) {
-    await prisma.setting.upsert({
-      where: { key: set.key },
-      update: {},
-      create: set,
+    await prisma.setting.create({
+      data: set
     });
   }
-  console.log('✅ Default settings created/verified.');
+  console.log('✅ Default settings created.');
 
   console.log('🎉 Database seeding complete!');
 }
