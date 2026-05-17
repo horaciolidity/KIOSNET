@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CREDIT
+}
+
+enum SaleStatus {
+  COMPLETED
+  PENDING
+  CANCELLED
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+enum RegisterStatus {
+  OPEN
+  CLOSED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(EMPLOYEE)
+  active    Boolean  @default(true)
+  sales     Sale[]
+  registers CashRegister[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id           String     @id @default(uuid())
+  name         String
+  barcode      String?    @unique
+  description  String?
+  categoryId   String
+  category     Category   @relation(fields: [categoryId], references: [id])
+  unit         String     @default("UNIDAD") // UNIDAD, LITRO, KILO
+  costPrice    Float
+  sellingPrice Float
+  stock        Float      @default(0)
+  minStock     Float      @default(5)
+  image        String?
+  active       Boolean    @default(true)
+  items        SaleItem[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  address     String?
+  creditLimit Float    @default(0)
+  balance     Float    @default(0)
+  sales       Sale[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Sale {
+  id            String        @id @default(uuid())
+  total         Float
+  subtotal      Float
+  discount      Float         @default(0)
+  paymentMethod PaymentMethod @default(CASH)
+  status        SaleStatus    @default(COMPLETED)
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  sellerId      String
+  seller        User          @relation(fields: [sellerId], references: [id])
+  items         SaleItem[]
+  receivedAmount Float?
+  changeAmount   Float?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float
+  price     Float
+  costPrice Float
+}
+
+model CashRegister {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  openingBalance Float
+  closingBalance Float?
+  status         RegisterStatus @default(OPEN)
+  openedAt       DateTime       @default(now())
+  closedAt       DateTime?
+  notes          String?
+  movements      CashMovement[]
+}
+
+model CashMovement {
+  id          String       @id @default(uuid())
+  registerId  String
+  register    CashRegister @relation(fields: [registerId], references: [id])
+  amount      Float
+  type        MovementType
+  description String
+  createdAt   DateTime     @default(now())
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, success, error
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
