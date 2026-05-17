@@ -171,7 +171,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           <button 
             onClick={handleRoleToggle}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left"
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all text-left ${
+              isEmployee 
+                ? 'bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 animate-pulse' 
+                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
           >
             <div className={isEmployee ? 'text-orange-500' : 'text-emerald-500'}>
               {isEmployee ? <Lock size={20} /> : <Unlock size={20} />}
@@ -182,6 +186,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <p className={`text-sm font-black mt-0.5 ${isEmployee ? 'text-orange-500' : 'text-emerald-500'}`}>
                   {isEmployee ? 'Empleado' : 'Administrador'}
                 </p>
+                {isEmployee && (
+                  <p className="text-[9px] text-blue-500 dark:text-blue-400 font-bold mt-1">Clic para Desbloquear</p>
+                )}
               </div>
             )}
           </button>
@@ -282,11 +289,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* PIN Modal */}
       {isPinModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[32px] shadow-2xl p-8 border border-slate-100 dark:border-slate-800 space-y-6">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[32px] shadow-2xl p-8 border border-slate-100 dark:border-slate-800 space-y-6 animate-in zoom-in-95 duration-300">
             <div className="text-center space-y-2">
               <h3 className="text-xl font-black text-slate-900 dark:text-white">Cambiar a Administrador</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Ingrese el PIN de Seguridad configurado en Ajustes para desbloquear.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Ingrese el PIN de Seguridad (PIN por defecto: <strong className="text-blue-600 dark:text-blue-400">1234</strong>) para desbloquear.</p>
             </div>
             <div className="space-y-4">
               <input 
