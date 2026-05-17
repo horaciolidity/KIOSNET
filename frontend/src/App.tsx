@@ -24,7 +24,8 @@ const App: React.FC = () => {
   const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
 
   React.useEffect(() => {
-    if (user && user.subActive) {
+    const hasAccess = user && (user.subActive || (user.salesCount !== undefined && user.salesCount < 50));
+    if (hasAccess) {
       fetchProducts();
       fetchCustomers();
       fetchActiveSession();
@@ -33,8 +34,9 @@ const App: React.FC = () => {
 
   const isEmployee = user?.role === 'EMPLOYEE';
 
-  // SaaS Multitenant billing blocker
-  if (user && !user.subActive) {
+  // SaaS Multitenant billing blocker: block ONLY if no subscription AND 50 or more sales made!
+  const salesCount = user?.salesCount ?? 0;
+  if (user && !user.subActive && salesCount >= 50) {
     return <SubscriptionPay />;
   }
 

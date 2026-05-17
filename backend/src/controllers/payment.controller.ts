@@ -99,21 +99,29 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
     }
 
+    const { plan } = req.body; // 'STANDARD' or 'PRO'
+    if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
+      return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
+    }
+
+    const price = plan === 'PRO' ? 15730 : 12320;
+    const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
+    const planId = plan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+
     const client = getMpClient();
     const preference = new Preference(client);
 
     const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
 
-    // Monthly subscription price of $5000 ARS
     const response = await preference.create({
       body: {
         items: [
           {
-            id: 'kiosnet_subscription_pro',
-            title: 'Suscripción KIOSNET Pro (Mensual)',
+            id: planId,
+            title: title,
             quantity: 1,
-            unit_price: 5000,
+            unit_price: price,
             currency_id: 'ARS'
           }
         ],
@@ -124,7 +132,7 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
         },
         auto_return: 'approved',
         notification_url: notificationUrl,
-        external_reference: `sub_${tenantId}` // Prefixed with sub_ to mark it as subscription pay!
+        external_reference: `sub_${plan}_${tenantId}` // Prefixed with sub_PLAN_ to detect plan on webhook!
       }
     });
 
@@ -161,17 +169,30 @@ export const handleMpWebhook = async (req: Request, res: Response) => {
       if (paymentInfo.status === 'approved' && externalRef) {
         if (externalRef.startsWith('sub_')) {
           // 1. Process Subscription Payment
-          const tenantId = externalRef.replace('sub_', '');
+          let tenantId = '';
+          let plan = 'STANDARD';
+          
+          if (externalRef.startsWith('sub_PRO_')) {
+            tenantId = externalRef.replace('sub_PRO_', '');
+            plan = 'PRO';
+          } else if (externalRef.startsWith('sub_STANDARD_')) {
+            tenantId = externalRef.replace('sub_STANDARD_', '');
+            plan = 'STANDARD';
+          } else {
+            // Fallback for older subscription references
+            tenantId = externalRef.replace('sub_', '');
+            plan = 'PRO';
+          }
           
           await prisma.tenant.update({
             where: { id: tenantId },
             data: {
               subActive: true,
-              plan: 'PRO'
+              plan: plan
             }
           });
 
-          console.log(`Tenant ${tenantId} subscription set to active (PRO Plan).`);
+          console.log(`Tenant ${tenantId} subscription set to active (${plan} Plan).`);
         } else {
           // 2. Process Standard Sale Payment
           const saleId = externalRef;

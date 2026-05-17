@@ -96,6 +96,10 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: '1d' }
     );
 
+    const salesCount = await prisma.sale.count({
+      where: { tenantId: user.tenantId }
+    });
+
     res.json({
       message: autoRegistered 
         ? '¡Comercio creado y registrado con éxito!' 
@@ -108,6 +112,7 @@ export const login = async (req: Request, res: Response) => {
         tenantId: user.tenantId,
         plan: user.tenant.plan,
         subActive: user.tenant.subActive,
+        salesCount: salesCount
       },
       token,
       autoRegistered
@@ -186,6 +191,7 @@ export const register = async (req: Request, res: Response) => {
         tenantId: result.user.tenantId,
         plan: result.tenant.plan,
         subActive: result.tenant.subActive,
+        salesCount: 0
       }
     });
   } catch (error) {
@@ -207,6 +213,10 @@ export const getCurrentUser = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
+    const salesCount = await prisma.sale.count({
+      where: { tenantId: user.tenantId }
+    });
+
     res.json({
       user: {
         id: user.id,
@@ -216,6 +226,7 @@ export const getCurrentUser = async (req: any, res: Response) => {
         tenantId: user.tenantId,
         plan: user.tenant.plan,
         subActive: user.tenant.subActive,
+        salesCount: salesCount
       }
     });
   } catch (error) {

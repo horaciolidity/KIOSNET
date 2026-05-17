@@ -9,6 +9,7 @@ interface User {
   tenantId: string;
   plan: string;
   subActive: boolean;
+  salesCount?: number;
 }
 
 interface AuthState {
