@@ -8,21 +8,88 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({
+    if (!email || !password) {
+      return res.status(400).json({ message: 'El correo y la contraseña son requeridos' });
+    }
+
+    // 1. Check if user exists
+    let user = await prisma.user.findUnique({
       where: { email },
       include: { tenant: true }
     });
 
+    let autoRegistered = false;
+
+    if (!user) {
+      // 2. AUTO-REGISTRATION: User does not exist, provision tenant + admin account on the fly!
+      console.log(`Auto-registrando nuevo comercio y administrador para: ${email}`);
+      const storeName = `Comercio de ${email.split('@')[0]}`;
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Create Tenant
+        const newTenant = await tx.tenant.create({
+          data: {
+            name: storeName,
+            plan: 'PRO',
+            subActive: false, // Needs subscription activation!
+          }
+        });
+
+        // Create Admin User
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name: email.split('@')[0],
+            role: 'ADMIN',
+            active: true,
+            tenantId: newTenant.id
+          }
+        });
+
+        // Seed default Categories
+        await tx.category.createMany({
+          data: [
+            { name: 'General', tenantId: newTenant.id },
+            { name: 'Bebidas', tenantId: newTenant.id },
+            { name: 'Comestibles', tenantId: newTenant.id }
+          ]
+        });
+
+        // Seed default Settings
+        await tx.setting.createMany({
+          data: [
+            { key: 'business_name', value: storeName, tenantId: newTenant.id },
+            { key: 'business_phone', value: '', tenantId: newTenant.id },
+            { key: 'business_address', value: '', tenantId: newTenant.id },
+            { key: 'business_tax_id', value: '', tenantId: newTenant.id },
+            { key: 'mercado_pago_active', value: 'false', tenantId: newTenant.id }
+          ]
+        });
+
+        return { tenant: newTenant, user: newUser };
+      });
+
+      // Retrieve full newly created user object
+      user = await prisma.user.findUnique({
+        where: { id: result.user.id },
+        include: { tenant: true }
+      });
+      autoRegistered = true;
+    } else {
+      // 3. STANDARD LOGIN: User exists, verify credentials
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Contraseña incorrecta' });
+      }
+    }
+
     if (!user || !user.active) {
-      return res.status(401).json({ message: 'Credenciales inválidas o cuenta inactiva' });
+      return res.status(401).json({ message: 'Esta cuenta se encuentra inactiva' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
-
+    // 4. Issue JWT Access Token
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET || 'your_super_secret_jwt_key_change_this',
@@ -30,6 +97,9 @@ export const login = async (req: Request, res: Response) => {
     );
 
     res.json({
+      message: autoRegistered 
+        ? '¡Comercio creado y registrado con éxito!' 
+        : 'Sesión iniciada correctamente',
       user: {
         id: user.id,
         email: user.email,
@@ -40,9 +110,11 @@ export const login = async (req: Request, res: Response) => {
         subActive: user.tenant.subActive,
       },
       token,
+      autoRegistered
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Error en el servidor al iniciar sesión' });
+  } catch (error: any) {
+    console.error('Error in login auto-registration:', error);
+    res.status(500).json({ message: 'Error en el servidor al procesar el inicio de sesión', error: error.message });
   }
 };
 
@@ -54,7 +126,6 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Todos los campos son requeridos (email, password, name, storeName)' });
     }
 
-    // Check if the user email is already registered globally
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -63,21 +134,17 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Perform database operations in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create a new isolated Tenant (Comercio)
       const tenant = await tx.tenant.create({
         data: {
           name: storeName,
           plan: 'PRO',
-          subActive: false, // Starts as inactive; requires subscription payment!
+          subActive: false,
         }
       });
 
-      // 2. Create the Admin user for this Tenant
       const user = await tx.user.create({
         data: {
           email,
@@ -88,7 +155,6 @@ export const register = async (req: Request, res: Response) => {
         }
       });
 
-      // 3. Seed default Categories for this Tenant
       await tx.category.createMany({
         data: [
           { name: 'General', tenantId: tenant.id },
@@ -97,7 +163,6 @@ export const register = async (req: Request, res: Response) => {
         ]
       });
 
-      // 4. Seed default Settings for this Tenant
       await tx.setting.createMany({
         data: [
           { key: 'business_name', value: storeName, tenantId: tenant.id },
@@ -112,7 +177,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({
-      message: 'Comercio registrado exitosamente. Por favor, activa tu cuenta.',
+      message: 'Comercio registrado exitosamente.',
       user: {
         id: result.user.id,
         email: result.user.email,

@@ -24,18 +24,24 @@ const Login: React.FC = () => {
 
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { user, token } = response.data;
+      const { user, token, autoRegistered } = response.data;
       
-      setAuth(user, token);
-      
-      if (user.role === 'ADMIN') {
-        navigate('/dashboard');
+      if (autoRegistered) {
+        setSuccess('¡Comercio creado y registrado con éxito! Redirigiendo...');
       } else {
-        navigate('/pos');
+        setSuccess('Sesión iniciada. Redirigiendo...');
       }
+      
+      setTimeout(() => {
+        setAuth(user, token);
+        if (user.role === 'ADMIN') {
+          navigate('/dashboard');
+        } else {
+          navigate('/pos');
+        }
+      }, 1200);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Credenciales incorrectas o error de conexión');
-    } finally {
       setLoading(false);
     }
   };
