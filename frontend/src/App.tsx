@@ -24,8 +24,7 @@ const App: React.FC = () => {
   const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
 
   React.useEffect(() => {
-    const hasAccess = user && (user.subActive || (user.salesCount !== undefined && user.salesCount < 50));
-    if (hasAccess) {
+    if (user) {
       fetchProducts();
       fetchCustomers();
       fetchActiveSession();

@@ -22,6 +22,10 @@ const Cash: React.FC = () => {
   const { user } = useAuthStore();
   const { security } = useSettingsStore();
   const { session, openBox, closeBox, addTransaction } = useCashStore();
+
+  React.useEffect(() => {
+    useCashStore.getState().fetchActiveSession();
+  }, []);
   const isEmployee = user?.role === 'EMPLOYEE' && (security?.employeeBlockCash ?? true);
   const [openingAmount, setOpeningAmount] = useState<string>('');
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);

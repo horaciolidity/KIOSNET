@@ -172,8 +172,10 @@ export const useCashStore = create<CashState>((set, get) => ({
         history: [openTx, ...get().history],
         loading: false
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error opening cash register in Supabase:', error);
+      const errMsg = error.response?.data?.message || 'Error inesperado al abrir la caja';
+      alert(`Error al abrir caja: ${errMsg}`);
       set({ loading: false });
     }
   },
@@ -216,8 +218,10 @@ export const useCashStore = create<CashState>((set, get) => ({
         history: [closeTx, ...get().history],
         loading: false
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error closing cash register in Supabase:', error);
+      const errMsg = error.response?.data?.message || 'Error inesperado al cerrar la caja';
+      alert(`Error al cerrar caja: ${errMsg}`);
       set({ loading: false });
     }
   },
@@ -288,8 +292,10 @@ export const useCashStore = create<CashState>((set, get) => ({
           timestamp: savedMovement.createdAt
         } : t)
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error recording movement in Supabase:', error);
+      const errMsg = error.response?.data?.message || 'Error inesperado al registrar el movimiento';
+      alert(`Error al registrar movimiento: ${errMsg}`);
       // Revert if API failed
       set({
         session,
