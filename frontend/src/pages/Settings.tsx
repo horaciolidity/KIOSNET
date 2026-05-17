@@ -8,12 +8,13 @@ import {
   Store, 
   ChevronRight,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  QrCode
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
 
 const Settings: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>('business');
   const [showSaved, setShowSaved] = useState(false);
   
   const { 
@@ -79,6 +80,12 @@ const Settings: React.FC = () => {
             title="Plan y Suscripción" 
             active={activeSection === 'plan'} 
             onClick={() => setActiveSection('plan')}
+          />
+          <NavButton 
+            icon={<QrCode size={20} />} 
+            title="Integraciones API" 
+            active={activeSection === 'api'} 
+            onClick={() => setActiveSection('api')}
           />
 
         </div>
@@ -228,6 +235,35 @@ const Settings: React.FC = () => {
                       </button>
                     </div>
                     <CreditCard className="absolute -right-10 -bottom-10 w-48 h-48 text-white/10 -rotate-12" />
+                  </div>
+                )}
+
+                {activeSection === 'api' && (
+                  <div className="space-y-6 animate-in fade-in duration-300">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4 flex items-center gap-2">
+                      <QrCode className="text-blue-600" /> Mercado Pago (QR Dinámico)
+                    </h3>
+                    <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-500/20 text-sm text-blue-800 dark:text-blue-300 mb-6 font-medium">
+                      Configura tu cuenta de Mercado Pago para generar cobros automáticos mediante código QR en tu mostrador o pantalla display.
+                    </div>
+                    <div className="space-y-4">
+                      <Toggle 
+                        label="Activar Cobro por QR en POS" 
+                        description="Habilita la opción de cobrar con QR dinámico de Mercado Pago en la pantalla de ventas."
+                        checked={businessInfo.mercadoPago?.isActive || false}
+                        onChange={(val: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, isActive: val } })}
+                      />
+                      <Input 
+                        label="Access Token (Producción)" 
+                        value={businessInfo.mercadoPago?.accessToken || ''} 
+                        onChange={(e: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, accessToken: e.target.value } })} 
+                      />
+                      <Input 
+                        label="ID de Caja (POS ID)" 
+                        value={businessInfo.mercadoPago?.posId || ''} 
+                        onChange={(e: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, posId: e.target.value } })} 
+                      />
+                    </div>
                   </div>
                 )}
 
