@@ -49,8 +49,10 @@ const POS: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'Todos'>('Todos');
   
-  const isPro = subscription.plan === 'PRO';
-  const hasMP = businessInfo.mercadoPago?.isActive;
+  const activePlan = user?.subActive ? user?.plan : 'FREE';
+  const isPro = activePlan === 'PRO';
+  const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
+  const hasMP = isPro && businessInfo.mercadoPago?.isActive;
 
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -518,7 +520,7 @@ const POS: React.FC = () => {
                     <PaymentMethodBtn active={paymentMethod === 'TRANSFERENCIA'} onClick={() => setPaymentMethod('TRANSFERENCIA')} icon={<SendHorizontal size={24}/>} label="Transf." />
                     <PaymentMethodBtn active={paymentMethod === 'DEBITO'} onClick={() => setPaymentMethod('DEBITO')} icon={<CreditCard size={24}/>} label="Débito" />
                     <PaymentMethodBtn active={paymentMethod === 'CREDITO'} onClick={() => setPaymentMethod('CREDITO')} icon={<CreditCard size={24}/>} label="Crédito" />
-                    {isPro && (
+                    {isStandardOrPro && (
                       <PaymentMethodBtn active={paymentMethod === 'CUENTA_CORRIENTE'} onClick={() => setPaymentMethod('CUENTA_CORRIENTE')} icon={<UserPlus size={24}/>} label="Cta. Cte" />
                     )}
                     {hasMP && (
