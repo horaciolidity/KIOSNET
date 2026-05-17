@@ -41,7 +41,7 @@ const CATEGORY_EMOJIS: Record<ProductCategory, string> = {
 
 const POS: React.FC = () => {
   const { products } = useInventoryStore();
-  const { businessInfo, subscription } = useSettingsStore();
+  const { businessInfo } = useSettingsStore();
   const { session, addTransaction } = useCashStore();
   const { customers } = useCustomerStore();
   const { user } = useAuthStore();
