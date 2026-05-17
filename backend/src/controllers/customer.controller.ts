@@ -34,7 +34,7 @@ export const createCustomer = async (req: Request, res: Response) => {
 
 export const getCustomerBalance = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const customer = await prisma.customer.findUnique({
       where: { id },
       select: { balance: true, creditLimit: true }
@@ -47,5 +47,41 @@ export const getCustomerBalance = async (req: Request, res: Response) => {
     res.json(customer);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener balance' });
+  }
+};
+
+export const updateCustomer = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const { name, phone, address, creditLimit, balance } = req.body;
+    
+    const customer = await prisma.customer.update({
+      where: { id },
+      data: {
+        name,
+        phone,
+        address,
+        creditLimit: creditLimit !== undefined ? Number(creditLimit) : undefined,
+        balance: balance !== undefined ? Number(balance) : undefined
+      }
+    });
+    
+    res.json(customer);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al actualizar cliente' });
+  }
+};
+
+export const deleteCustomer = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    
+    await prisma.customer.delete({
+      where: { id }
+    });
+    
+    res.json({ message: 'Cliente eliminado exitosamente' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar cliente' });
   }
 };

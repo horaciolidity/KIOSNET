@@ -22,8 +22,9 @@ import { useInventoryStore } from '../store/useInventoryStore';
 import type { Product, ProductCategory } from '../store/useInventoryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useCashStore } from '../store/useCashStore';
-
 import { useCustomerStore } from '../store/useCustomerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import api from '../utils/api';
 
 interface CartItem extends Product {
   quantity: number;
@@ -39,10 +40,11 @@ const CATEGORY_EMOJIS: Record<ProductCategory, string> = {
 };
 
 const POS: React.FC = () => {
-  const { products, updateProduct } = useInventoryStore();
+  const { products } = useInventoryStore();
   const { businessInfo, subscription } = useSettingsStore();
   const { session, addTransaction } = useCashStore();
-  const { customers, addDebt } = useCustomerStore();
+  const { customers } = useCustomerStore();
+  const { user } = useAuthStore();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'Todos'>('Todos');
@@ -59,6 +61,7 @@ const POS: React.FC = () => {
   const [saleId, setSaleId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [isWaitingForMP, setIsWaitingForMP] = useState(false);
+  const [mpInitPoint, setMpInitPoint] = useState<string>('');
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
 
   const filteredProducts = products.filter(p => {
@@ -146,63 +149,164 @@ const POS: React.FC = () => {
     }
   }, [cart, total, paymentMethod, isWaitingForMP, change, amountPaid, isFinished]);
 
-  const finalizeTransaction = (newSaleId: string) => {
-    cart.forEach(item => {
-      updateProduct(item.id, { stock: item.stock - item.quantity });
-    });
-
-    const customer = customers.find(c => c.id === selectedCustomerId);
-    const customerName = customer ? customer.name : '';
-
-    addTransaction({
-      type: 'VENTA',
-      amount: total,
-      profit: profit,
-      method: paymentMethod === 'MERCADOPAGO' ? 'TRANSFERENCIA' as any : paymentMethod as any,
-      description: `Venta ${newSaleId} ${customerName ? `(Cliente: ${customerName})` : ''} ${paymentMethod === 'MERCADOPAGO' ? '[MP QR]' : ''} ${note ? '- ' + note : ''}`,
-      details: {
-        items: cart.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          category: item.category
-        })),
-        saleId: newSaleId,
-        note: note,
-        customerId: selectedCustomerId
-      }
-    });
-
-    if (paymentMethod === 'CUENTA_CORRIENTE' && selectedCustomerId) {
-      addDebt(selectedCustomerId, total);
+  const finalizeTransaction = async () => {
+    if (!user) {
+      alert('Debe iniciar sesión para realizar ventas.');
+      return;
     }
 
-    setIsFinished(true);
-    setIsWaitingForMP(false);
-    useSettingsStore.getState().incrementSales();
+    try {
+      const payload = {
+        total,
+        subtotal: total,
+        discount: 0,
+        paymentMethod: paymentMethod === 'EFECTIVO' ? 'CASH' : paymentMethod === 'CUENTA_CORRIENTE' ? 'CREDIT' : 'TRANSFER',
+        customerId: selectedCustomerId || null,
+        sellerId: user.id,
+        receivedAmount: Number(amountPaid) || total,
+        changeAmount: change,
+        items: cart.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
+          costPrice: item.costPrice
+        }))
+      };
+
+      const response = await api.post('/sales', payload);
+      const savedSale = response.data;
+
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      const customerName = customer ? customer.name : '';
+
+      addTransaction({
+        type: 'VENTA',
+        amount: total,
+        profit: profit,
+        method: paymentMethod === 'MERCADOPAGO' ? 'TRANSFERENCIA' as any : paymentMethod as any,
+        description: `Venta ${savedSale.id} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
+        details: {
+          items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            category: item.category
+          })),
+          saleId: savedSale.id,
+          note: note,
+          customerId: selectedCustomerId
+        }
+      });
+
+      // Reload products and customers to ensure stock levels and balances are 100% correct in UI!
+      useInventoryStore.getState().fetchProducts();
+      useCustomerStore.getState().fetchCustomers();
+
+      setSaleId(savedSale.id);
+      setIsFinished(true);
+      setIsWaitingForMP(false);
+      useSettingsStore.getState().incrementSales();
+    } catch (error) {
+      console.error('Error finalizando la venta:', error);
+      alert('Hubo un error al procesar la venta en el servidor.');
+    }
   };
 
-  const handleFinishSale = () => {
+  const handleFinishSale = async () => {
     if (paymentMethod === 'CUENTA_CORRIENTE' && !selectedCustomerId) {
       alert('Debes seleccionar un cliente para cobrar con Cuenta Corriente.');
       return;
     }
 
-    const newSaleId = `V-${Math.floor(100000 + Math.random() * 900000)}`;
-    setSaleId(newSaleId);
+    if (!user) {
+      alert('Debe iniciar sesión para realizar ventas.');
+      return;
+    }
 
     if (paymentMethod === 'MERCADOPAGO') {
       setIsWaitingForMP(true);
-      // Simulate API call to MP
-      setTimeout(() => {
-        finalizeTransaction(newSaleId);
-      }, 5000); // Wait 5 seconds to simulate customer scanning and paying
+      try {
+        const payload = {
+          total,
+          customerId: selectedCustomerId || null,
+          sellerId: user.id,
+          items: cart.map(item => ({
+            productId: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            costPrice: item.costPrice
+          }))
+        };
+
+        const res = await api.post('/payments/mercadopago/preference', payload);
+        const { initPoint, saleId: pendingSaleId } = res.data;
+
+        setSaleId(pendingSaleId);
+        setMpInitPoint(initPoint);
+
+        // Start polling the server for sale status
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await api.get(`/sales/status/${pendingSaleId}`);
+            if (statusRes.data.status === 'COMPLETED') {
+              clearInterval(pollInterval);
+              
+              // Refresh stores
+              useInventoryStore.getState().fetchProducts();
+              useCustomerStore.getState().fetchCustomers();
+
+              // Register local cash transaction
+              const customer = customers.find(c => c.id === selectedCustomerId);
+              const customerName = customer ? customer.name : '';
+
+              addTransaction({
+                type: 'VENTA',
+                amount: total,
+                profit: profit,
+                method: 'TRANSFERENCIA',
+                description: `Venta MP QR ${pendingSaleId} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
+                details: {
+                  items: cart.map(item => ({
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                    category: item.category
+                  })),
+                  saleId: pendingSaleId,
+                  note: 'Aprobado vía Mercado Pago Webhook',
+                  customerId: selectedCustomerId
+                }
+              });
+
+              setIsFinished(true);
+              setIsWaitingForMP(false);
+              setMpInitPoint('');
+              useSettingsStore.getState().incrementSales();
+            }
+          } catch (err) {
+            console.error('Error polling status:', err);
+          }
+        }, 2000);
+
+        // Store poll interval globally to clear it later
+        (window as any).mpPollInterval = pollInterval;
+
+      } catch (error) {
+        console.error('Error starting Mercado Pago transaction:', error);
+        alert('Hubo un error al conectar con Mercado Pago. Intente nuevamente.');
+        setIsWaitingForMP(false);
+      }
     } else {
-      finalizeTransaction(newSaleId);
+      finalizeTransaction();
     }
   };
 
   const resetPOS = () => {
+    if ((window as any).mpPollInterval) {
+      clearInterval((window as any).mpPollInterval);
+      (window as any).mpPollInterval = null;
+    }
     setCart([]);
     setIsCheckoutOpen(false);
     setIsFinished(false);
@@ -210,6 +314,7 @@ const POS: React.FC = () => {
     setNote('');
     setSaleId('');
     setSelectedCustomerId('');
+    setMpInitPoint('');
   };
 
   const handlePrint = () => {
@@ -401,7 +506,7 @@ const POS: React.FC = () => {
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/70 backdrop-blur-sm print:hidden">
           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
-            {!isFinished ? (
+            {!isFinished && !isWaitingForMP ? (
               <>
                 <div className="flex-1 p-8 space-y-8 overflow-y-auto">
                   <div className="flex justify-between items-center">
@@ -483,16 +588,31 @@ const POS: React.FC = () => {
                 </div>
               </>
             ) : isWaitingForMP ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-8 bg-[#009EE3] text-white">
-                <QrCode size={80} className="animate-pulse" />
-                <div className="space-y-4">
-                  <h2 className="text-3xl font-black">Esperando Pago...</h2>
-                  <p className="text-blue-100 text-lg max-w-sm">Pide al cliente que escanee tu código QR de Mercado Pago con su aplicación.</p>
+              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-6 bg-slate-900 text-white min-h-[500px]">
+                <h2 className="text-3xl font-black text-[#009EE3] flex items-center gap-2">
+                  <QrCode size={36} /> Mercado Pago
+                </h2>
+                <div className="bg-white p-4 rounded-3xl shadow-xl animate-in zoom-in-95 duration-300">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mpInitPoint)}`} 
+                    alt="QR Mercado Pago" 
+                    className="w-[220px] h-[220px]"
+                  />
                 </div>
-                <div className="flex items-center gap-3 text-blue-200 bg-black/10 px-6 py-3 rounded-full font-bold">
-                  <Loader2 className="animate-spin" size={20} />
-                  Aguardando confirmación de la API
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold">Escanee para Pagar</h3>
+                  <p className="text-slate-400 text-sm max-w-xs mx-auto">Escanea el código QR dinámico desde la App de Mercado Pago o tu banco para completar el pago de <strong>${total.toLocaleString()}</strong>.</p>
                 </div>
+                <div className="flex items-center gap-3 text-slate-300 bg-white/5 px-6 py-3 rounded-full text-sm font-bold">
+                  <Loader2 className="animate-spin text-[#009EE3]" size={18} />
+                  Aguardando confirmación de pago...
+                </div>
+                <button 
+                  onClick={resetPOS}
+                  className="text-red-400 hover:text-red-300 font-bold text-sm underline pt-2"
+                >
+                  Cancelar Pago
+                </button>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-8 animate-in zoom-in-95 duration-300 overflow-y-auto">

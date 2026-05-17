@@ -11,6 +11,7 @@ import registerRoutes from './routes/register.routes';
 import customerRoutes from './routes/customer.routes';
 import categoryRoutes from './routes/category.routes';
 import notificationRoutes from './routes/notification.routes';
+import paymentRoutes from './routes/payment.routes';
 import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/registers', registerRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'POS System API is running' });

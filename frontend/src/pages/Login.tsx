@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Lock, Mail, Loader2 } from 'lucide-react';
+import api from '../utils/api';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,27 +18,19 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      // Mock login for now
-      setTimeout(() => {
-        if (email === 'admin@pos.com' && password === 'admin123') {
-          setAuth(
-            { id: '1', email: 'admin@pos.com', name: 'Administrador', role: 'ADMIN' },
-            'mock-token'
-          );
-          navigate('/dashboard');
-        } else if (email === 'empleado@pos.com' && password === 'empleado123') {
-          setAuth(
-            { id: '2', email: 'empleado@pos.com', name: 'Cajero / Empleado', role: 'EMPLOYEE' },
-            'mock-token'
-          );
-          navigate('/pos');
-        } else {
-          setError('Credenciales incorrectas');
-        }
-        setLoading(false);
-      }, 1000);
-    } catch (err) {
-      setError('Error al iniciar sesión');
+      const response = await api.post('/auth/login', { email, password });
+      const { user, token } = response.data;
+      
+      setAuth(user, token);
+      
+      if (user.role === 'ADMIN') {
+        navigate('/dashboard');
+      } else {
+        navigate('/pos');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Credenciales incorrectas o error de conexión');
+    } finally {
       setLoading(false);
     }
   };

@@ -12,9 +12,24 @@ import Settings from './pages/Settings';
 import Customers from './pages/Customers';
 import Layout from './components/layout/Layout';
 import { useAuthStore } from './store/useAuthStore';
+import { useInventoryStore } from './store/useInventoryStore';
+import { useCustomerStore } from './store/useCustomerStore';
+import { useCashStore } from './store/useCashStore';
 
 const App: React.FC = () => {
   const { user } = useAuthStore();
+  const fetchProducts = useInventoryStore((state) => state.fetchProducts);
+  const fetchCustomers = useCustomerStore((state) => state.fetchCustomers);
+  const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
+
+  React.useEffect(() => {
+    if (user) {
+      fetchProducts();
+      fetchCustomers();
+      fetchActiveSession();
+    }
+  }, [user, fetchProducts, fetchCustomers, fetchActiveSession]);
+
   const isEmployee = user?.role === 'EMPLOYEE';
 
   return (

@@ -30,7 +30,7 @@ export const openRegister = async (req: Request, res: Response) => {
 
 export const closeRegister = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const { closingBalance, notes } = req.body;
 
     const register = await prisma.cashRegister.update({
@@ -51,7 +51,7 @@ export const closeRegister = async (req: Request, res: Response) => {
 
 export const getMovements = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const movements = await prisma.cashMovement.findMany({
       where: { registerId: id },
       orderBy: { createdAt: 'desc' }
@@ -78,5 +78,20 @@ export const addMovement = async (req: Request, res: Response) => {
     res.status(201).json(movement);
   } catch (error) {
     res.status(500).json({ message: 'Error al registrar movimiento' });
+  }
+};
+
+export const getActiveRegister = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params as { userId: string };
+    
+    const register = await prisma.cashRegister.findFirst({
+      where: { userId, status: 'OPEN' },
+      include: { movements: true }
+    });
+    
+    res.json(register);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener caja activa' });
   }
 };

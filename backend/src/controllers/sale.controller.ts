@@ -88,3 +88,21 @@ export const getSales = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Error al obtener ventas' });
   }
 };
+
+export const getSaleStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+      select: { status: true }
+    });
+    
+    if (!sale) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+    
+    res.json({ status: sale.status });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener estado de la venta' });
+  }
+};
