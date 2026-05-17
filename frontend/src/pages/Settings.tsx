@@ -17,16 +17,35 @@ const Settings: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string | null>('business');
   const [showSaved, setShowSaved] = useState(false);
   
+  const store = useSettingsStore();
+  const businessInfo = store.businessInfo || {
+    name: 'Mi Comercio',
+    address: '',
+    phone: '',
+    email: '',
+    taxId: '',
+    mercadoPago: { accessToken: '', posId: '', isActive: false }
+  };
+  const notifications = store.notifications || {
+    lowStockAlerts: true,
+    dailyReports: true,
+    newSaleNotifications: true
+  };
+  const display = store.display || {
+    welcomeMessage: '',
+    showLogo: true
+  };
+  const security = store.security || {
+    adminPin: '1234',
+    employeeBlockInventory: true,
+    employeeBlockCash: true
+  };
   const { 
-    businessInfo, 
-    notifications, 
-    display, 
-    security,
     updateBusinessInfo, 
     updateNotifications, 
     updateDisplay,
     updateSecurity
-  } = useSettingsStore();
+  } = store;
 
   const handleSave = () => {
     setShowSaved(true);
