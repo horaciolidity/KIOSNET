@@ -31,7 +31,7 @@ export const login = async (req: Request, res: Response) => {
         const newTenant = await tx.tenant.create({
           data: {
             name: storeName,
-            plan: 'PRO',
+            plan: 'FREE',
             subActive: false, // Needs subscription activation!
           }
         });
@@ -89,6 +89,17 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Esta cuenta se encuentra inactiva' });
     }
 
+    // Dynamic subscription expiration check on login
+    let subActive = user.tenant.subActive;
+    if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+      await prisma.tenant.update({
+        where: { id: user.tenantId },
+        data: { subActive: false }
+      });
+      user.tenant.subActive = false;
+      subActive = false;
+    }
+
     // 4. Issue JWT Access Token
     const token = jwt.sign(
       { id: user.id, role: user.role },
@@ -111,7 +122,8 @@ export const login = async (req: Request, res: Response) => {
         role: user.role,
         tenantId: user.tenantId,
         plan: user.tenant.plan,
-        subActive: user.tenant.subActive,
+        subActive: subActive,
+        subExpiresAt: user.tenant.subExpiresAt,
         salesCount: salesCount
       },
       token,
@@ -145,7 +157,7 @@ export const register = async (req: Request, res: Response) => {
       const tenant = await tx.tenant.create({
         data: {
           name: storeName,
-          plan: 'PRO',
+          plan: 'FREE',
           subActive: false,
         }
       });
@@ -191,6 +203,7 @@ export const register = async (req: Request, res: Response) => {
         tenantId: result.user.tenantId,
         plan: result.tenant.plan,
         subActive: result.tenant.subActive,
+        subExpiresAt: result.tenant.subExpiresAt,
         salesCount: 0
       }
     });
@@ -213,6 +226,17 @@ export const getCurrentUser = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
+    // Dynamic subscription expiration check
+    let subActive = user.tenant.subActive;
+    if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+      await prisma.tenant.update({
+        where: { id: user.tenantId },
+        data: { subActive: false }
+      });
+      user.tenant.subActive = false;
+      subActive = false;
+    }
+
     const salesCount = await prisma.sale.count({
       where: { tenantId: user.tenantId }
     });
@@ -225,7 +249,8 @@ export const getCurrentUser = async (req: any, res: Response) => {
         role: user.role,
         tenantId: user.tenantId,
         plan: user.tenant.plan,
-        subActive: user.tenant.subActive,
+        subActive: subActive,
+        subExpiresAt: user.tenant.subExpiresAt,
         salesCount: salesCount
       }
     });

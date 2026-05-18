@@ -33,12 +33,6 @@ const App: React.FC = () => {
 
   const isEmployee = user?.role === 'EMPLOYEE';
 
-  // SaaS Multitenant billing blocker: block ONLY if no subscription AND 50 or more sales made!
-  const salesCount = user?.salesCount ?? 0;
-  if (user && !user.subActive && salesCount >= 50) {
-    return <SubscriptionPay />;
-  }
-
   return (
     <Router>
       <Routes>
@@ -48,6 +42,10 @@ const App: React.FC = () => {
         <Route 
           path="/dashboard" 
           element={user ? <Layout><Dashboard /></Layout> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/billing" 
+          element={user ? (!isEmployee ? <Layout><SubscriptionPay /></Layout> : <Navigate to="/dashboard" />) : <Navigate to="/login" />} 
         />
         <Route 
           path="/pos" 

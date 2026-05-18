@@ -11,6 +11,7 @@ export interface AuthenticatedRequest extends Request {
     tenantId: string;
     plan: string;
     subActive: boolean;
+    subExpiresAt?: Date | null;
   };
 }
 
@@ -39,6 +40,16 @@ export const authMiddleware = async (
       return res.status(401).json({ message: 'Usuario no encontrado o inactivo.' });
     }
 
+    let subActive = user.tenant.subActive;
+    if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+      // Auto-expire subscription dynamically in DB
+      await prisma.tenant.update({
+        where: { id: user.tenantId },
+        data: { subActive: false }
+      });
+      subActive = false;
+    }
+
     (req as AuthenticatedRequest).user = {
       id: user.id,
       email: user.email,
@@ -46,7 +57,8 @@ export const authMiddleware = async (
       role: user.role as 'ADMIN' | 'EMPLOYEE',
       tenantId: user.tenantId,
       plan: user.tenant.plan,
-      subActive: user.tenant.subActive,
+      subActive: subActive,
+      subExpiresAt: user.tenant.subExpiresAt,
     };
 
     next();

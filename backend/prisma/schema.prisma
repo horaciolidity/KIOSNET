@@ -9,23 +9,24 @@ datasource db {
 }
 
 model Tenant {
-  id         String         @id @default(uuid())
-  name       String
-  address    String?
-  phone      String?
-  taxId      String?
-  email      String?
-  plan       String         @default("FREE")
-  subActive  Boolean        @default(false)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  registers  CashRegister[]
-  categories Category[]
-  customers  Customer[]
-  products   Product[]
-  sales      Sale[]
-  settings   Setting[]
-  users      User[]
+  id           String         @id @default(uuid())
+  name         String
+  address      String?
+  phone        String?
+  taxId        String?
+  email        String?
+  plan         String         @default("FREE")
+  subActive    Boolean        @default(false)
+  subExpiresAt DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  registers    CashRegister[]
+  categories   Category[]
+  customers    Customer[]
+  products     Product[]
+  sales        Sale[]
+  settings     Setting[]
+  users        User[]
 }
 
 model User {

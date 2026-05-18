@@ -34,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, token, setAuth } = useAuthStore();
-  const { businessInfo, subscription } = useSettingsStore();
+  const { businessInfo } = useSettingsStore();
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -141,29 +141,38 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
-          {/* Mercado Pago Indicator */}
-          {isSidebarOpen && (
-            <div className="mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-4 rounded-2xl flex flex-col items-center text-center space-y-2">
+          {/* Real-time Subscription Indicator */}
+          {isSidebarOpen && user && (
+            <div className="mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-4 rounded-2xl flex flex-col items-center text-center space-y-2 animate-in fade-in duration-300">
               <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">
                 <Wallet size={20} />
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">Plan: {subscription.plan}</p>
-              {subscription.plan === 'FREE' ? (
-                <p className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                  {subscription.salesLimit - subscription.salesUsed} ventas restantes
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                Plan: {user.subActive ? (user.plan === 'PRO' ? 'PRO' : 'ESTÁNDAR') : 'GRATUITO'}
+              </p>
+              {!user.subActive ? (
+                <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-tight">
+                  {Math.max(0, 50 - (user.salesCount ?? 0))} ventas de prueba restantes
                 </p>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-emerald-600">Licencia Activa</p>
-                  <p className="text-[10px] font-bold text-slate-500">Saldo: ${subscription.remainingBalance?.toFixed(0)}</p>
+                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Licencia Activa</p>
+                  {user.subExpiresAt && (
+                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      Vence: {(() => {
+                        const d = new Date(user.subExpiresAt);
+                        return isNaN(d.getTime()) ? 'Mensual' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                      })()}
+                    </p>
+                  )}
                 </div>
               )}
-              {subscription.plan === 'FREE' && (
+              {!user.subActive && !isEmployee && (
                 <button 
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="w-full mt-2 bg-blue-600 text-white text-xs font-bold py-2 rounded-xl hover:bg-blue-700 transition-all"
+                  onClick={() => navigate('/billing')}
+                  className="w-full mt-2 bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-md"
                 >
-                  Actualizar Ahora
+                  Activar Suscripción
                 </button>
               )}
             </div>
@@ -242,6 +251,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          {user && !user.subActive && (user.salesCount ?? 0) >= 50 && (
+            <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-600 text-white px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border-b border-red-500/20 animate-in slide-in-from-top duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white shrink-0">
+                  <Lock size={20} className="animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm tracking-tight uppercase">¡Período gratuito completado!</h4>
+                  <p className="text-xs text-red-100 font-medium mt-0.5">
+                    Has alcanzado las 50 ventas de prueba. Las ventas están bloqueadas temporalmente hasta que actives tu suscripción. Puedes seguir agregando productos a tu inventario.
+                  </p>
+                </div>
+              </div>
+              {!isEmployee && (
+                <Link
+                  to="/billing"
+                  className="bg-white text-red-700 px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-slate-50 transition-all shadow-md shrink-0"
+                >
+                  Activar Suscripción
+                </Link>
+              )}
+            </div>
+          )}
           {children}
         </div>
       </main>

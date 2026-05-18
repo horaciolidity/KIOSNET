@@ -184,11 +184,15 @@ export const handleMpWebhook = async (req: Request, res: Response) => {
             plan = 'PRO';
           }
           
+          const subExpiresAt = new Date();
+          subExpiresAt.setMonth(subExpiresAt.getMonth() + 1);
+
           await prisma.tenant.update({
             where: { id: tenantId },
             data: {
               subActive: true,
-              plan: plan
+              plan: plan,
+              subExpiresAt: subExpiresAt
             }
           });
 

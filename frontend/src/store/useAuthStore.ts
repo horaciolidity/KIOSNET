@@ -9,6 +9,7 @@ interface User {
   tenantId: string;
   plan: string;
   subActive: boolean;
+  subExpiresAt?: string | Date | null;
   salesCount?: number;
 }
 

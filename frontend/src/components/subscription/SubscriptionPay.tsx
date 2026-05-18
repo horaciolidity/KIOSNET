@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap } from 'lucide-react';
+import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 
 const SubscriptionPay: React.FC = () => {
   const { user, token, setAuth, logout, setSubscriptionActive } = useAuthStore();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [paymentOpened, setPaymentOpened] = useState(false);
@@ -115,13 +117,24 @@ const SubscriptionPay: React.FC = () => {
             </div>
           </div>
           
-          <button 
-            onClick={logout}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-slate-400 hover:text-red-400 rounded-xl text-sm font-medium transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar Sesión
-          </button>
+          <div className="flex gap-2">
+            {(user?.subActive || (user?.salesCount ?? 0) < 50) && (
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white rounded-xl text-sm font-bold transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Volver
+              </button>
+            )}
+            <button 
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 text-slate-400 hover:text-red-400 rounded-xl text-sm font-medium transition-all cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
 
         {/* Free trial progress card */}

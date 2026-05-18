@@ -494,13 +494,22 @@ const POS: React.FC = () => {
             <span className="text-3xl font-black text-blue-600 tracking-tighter">${total.toLocaleString()}</span>
           </div>
 
-          <button 
-            disabled={cart.length === 0}
-            onClick={() => setIsCheckoutOpen(true)}
-            className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"
-          >
-            PAGAR AHORA
-          </button>
+          {!user?.subActive && (user?.salesCount ?? 0) >= 50 ? (
+            <button 
+              onClick={() => window.location.href = '/billing'}
+              className="w-full bg-gradient-to-r from-red-600 to-amber-600 text-white py-5 rounded-[24px] font-black text-lg hover:from-red-500 hover:to-amber-500 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-2"
+            >
+              VENTAS BLOQUEADAS (ACTIVA PLAN)
+            </button>
+          ) : (
+            <button 
+              disabled={cart.length === 0}
+              onClick={() => setIsCheckoutOpen(true)}
+              className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"
+            >
+              PAGAR AHORA
+            </button>
+          )}
         </div>
       </div>
 

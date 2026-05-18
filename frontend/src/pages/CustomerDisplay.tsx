@@ -6,11 +6,13 @@ import {
   Lock
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Link } from 'react-router-dom';
 
 const CustomerDisplay: React.FC = () => {
-  const { subscription, businessInfo } = useSettingsStore();
-  const isPro = subscription.plan === 'PRO';
+  const { user } = useAuthStore();
+  const { businessInfo } = useSettingsStore();
+  const isPro = user?.subActive && user?.plan === 'PRO';
 
   const [displayData, setDisplayData] = React.useState<any>({
     cart: [],

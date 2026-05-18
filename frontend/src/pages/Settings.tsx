@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, 
   Bell, 
@@ -18,6 +19,7 @@ const Settings: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string | null>('business');
   const [showSaved, setShowSaved] = useState(false);
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   
   const store = useSettingsStore();
   const businessInfo = store.businessInfo || {
@@ -280,8 +282,7 @@ const Settings: React.FC = () => {
                           <div className="pt-2">
                             <button 
                               onClick={() => {
-                                // Trigger subscription page display
-                                useAuthStore.setState({ user: { ...user!, subActive: false, salesCount: 50 } });
+                                navigate('/billing');
                               }}
                               className="bg-white text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow-md"
                             >
@@ -300,8 +301,7 @@ const Settings: React.FC = () => {
                           <div className="pt-2">
                             <button 
                               onClick={() => {
-                                // Trigger subscription page display
-                                useAuthStore.setState({ user: { ...user!, subActive: false, salesCount: 50 } });
+                                navigate('/billing');
                               }}
                               className="bg-white text-blue-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-slate-50 transition-all shadow-md"
                             >
