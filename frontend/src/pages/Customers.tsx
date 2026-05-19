@@ -7,18 +7,18 @@ import {
   Wallet, 
   Lock
 } from 'lucide-react';
-import { useSettingsStore } from '../store/useSettingsStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Link } from 'react-router-dom';
 
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCashStore } from '../store/useCashStore';
 
 const Customers: React.FC = () => {
-  const { subscription } = useSettingsStore();
+  const { user } = useAuthStore();
   const { customers, addCustomer, payDebt } = useCustomerStore();
   const { addTransaction } = useCashStore();
   
-  const isPro = subscription.plan === 'PRO';
+  const isPro = user?.subActive && user?.plan === 'PRO';
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modals state

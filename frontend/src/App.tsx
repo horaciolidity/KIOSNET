@@ -10,6 +10,7 @@ import History from './pages/History';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Customers from './pages/Customers';
+import SuperAdmin from './pages/SuperAdmin';
 import Layout from './components/layout/Layout';
 import { useAuthStore } from './store/useAuthStore';
 import { useInventoryStore } from './store/useInventoryStore';
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   }, [user, fetchProducts, fetchCustomers, fetchActiveSession]);
 
   const isEmployee = user?.role === 'EMPLOYEE';
+  const isSuperAdmin = user?.email === 'horaciowalterortiz@gmail.com';
 
   return (
     <Router>
@@ -74,6 +76,10 @@ const App: React.FC = () => {
         <Route 
           path="/customers" 
           element={user ? (!isEmployee ? <Layout><Customers /></Layout> : <Navigate to="/dashboard" />) : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/super-admin" 
+          element={user && isSuperAdmin ? <Layout><SuperAdmin /></Layout> : <Navigate to="/dashboard" />} 
         />
         <Route 
           path="/display" 

@@ -61,6 +61,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
+  const isSuperAdmin = user?.email === 'horaciowalterortiz@gmail.com';
+
   const menuItems = [
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/dashboard' },
     { icon: <ShoppingCart size={20} />, label: 'Ventas (POS)', path: '/pos' },
@@ -72,6 +74,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       { icon: <UserIcon size={20} />, label: 'Clientes (Crédito)', path: '/customers' },
       { icon: <LayoutDashboard size={20} />, label: 'Pantalla Cliente', path: '/display', external: true },
       { icon: <Settings size={20} />, label: 'Ajustes', path: '/settings' }
+    ] : []),
+    ...(isSuperAdmin ? [
+      { icon: <Lock size={20} className="text-amber-500" />, label: 'Panel Super Admin', path: '/super-admin' }
     ] : [])
   ];
 

@@ -1,17 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../utils/api';
 
 const SubscriptionPay: React.FC = () => {
   const { user, token, setAuth, logout, setSubscriptionActive } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
+  const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
+
+  // Parse search params to pre-select plan & fetch prices
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const planParam = params.get('plan');
+    if (planParam === 'STANDARD' || planParam === 'PRO') {
+      setSelectedPlan(planParam);
+    }
+
+    const fetchPrices = async () => {
+      try {
+        const response = await api.get('/payments/prices');
+        setPrices(response.data);
+      } catch (err) {
+        console.error('Error fetching dynamic plan prices:', err);
+      }
+    };
+    fetchPrices();
+  }, [location.search]);
 
   // 1. Poll the `/api/auth/me` endpoint to auto-unlock when payment is approved
   useEffect(() => {
@@ -200,7 +221,7 @@ const SubscriptionPay: React.FC = () => {
                 </div>
 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black">$12.320</span>
+                  <span className="text-4xl font-black">${prices.price_standard.toLocaleString()}</span>
                   <span className="text-slate-400 text-sm font-semibold">/ mes ARS</span>
                 </div>
 
@@ -251,7 +272,7 @@ const SubscriptionPay: React.FC = () => {
                 </div>
 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-indigo-200">$15.730</span>
+                  <span className="text-4xl font-black text-indigo-200">${prices.price_pro.toLocaleString()}</span>
                   <span className="text-slate-400 text-sm font-semibold">/ mes ARS</span>
                 </div>
 

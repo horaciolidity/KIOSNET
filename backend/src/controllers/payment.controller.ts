@@ -104,7 +104,14 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
     }
 
-    const price = plan === 'PRO' ? 15730 : 12320;
+    // Query dynamic pricing from SystemConfig
+    const configPrices = await prisma.systemConfig.findMany();
+    let price = plan === 'PRO' ? 15730 : 12320;
+    configPrices.forEach(cfg => {
+      if (plan === 'PRO' && cfg.key === 'price_pro') price = Number(cfg.value) || 15730;
+      if (plan === 'STANDARD' && cfg.key === 'price_standard') price = Number(cfg.value) || 12320;
+    });
+
     const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
     const planId = plan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
 
@@ -249,9 +256,32 @@ export const handleMpWebhook = async (req: Request, res: Response) => {
       }
     }
 
-    res.status(200).send('OK');
+    res.sendStatus(200);
   } catch (error: any) {
-    console.error('Error handling Mercado Pago Webhook:', error);
-    res.status(200).send('OK');
+    console.error('Error handling Mercado Pago webhook:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/payments/prices
+export const getPlanPrices = async (req: Request, res: Response) => {
+  try {
+    const configPrices = await prisma.systemConfig.findMany();
+    
+    let priceStandard = 12320;
+    let pricePro = 15730;
+
+    configPrices.forEach(cfg => {
+      if (cfg.key === 'price_standard') priceStandard = Number(cfg.value) || 12320;
+      if (cfg.key === 'price_pro') pricePro = Number(cfg.value) || 15730;
+    });
+
+    res.json({
+      price_standard: priceStandard,
+      price_pro: pricePro
+    });
+  } catch (error) {
+    console.error('Error getting plan prices:', error);
+    res.status(500).json({ message: 'Error al obtener los precios de los planes.' });
   }
 };

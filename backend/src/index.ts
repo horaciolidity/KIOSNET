@@ -12,6 +12,7 @@ import customerRoutes from './routes/customer.routes';
 import categoryRoutes from './routes/category.routes';
 import notificationRoutes from './routes/notification.routes';
 import paymentRoutes from './routes/payment.routes';
+import adminRoutes from './routes/admin.routes';
 import { authMiddleware } from './middlewares/auth.middleware';
 import prisma from './utils/prisma';
 
@@ -37,6 +38,7 @@ app.use('/api/customers', authMiddleware, customerRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/payments', paymentRoutes); // Route-level protection inside payment.routes.ts to keep webhook public
+app.use('/api/admin', authMiddleware, adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'POS System API is running' });

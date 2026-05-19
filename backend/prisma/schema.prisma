@@ -192,3 +192,8 @@ enum RegisterStatus {
   OPEN
   CLOSED
 }
+
+model SystemConfig {
+  key   String @id
+  value String
+}
