@@ -207,6 +207,16 @@ const POS: React.FC = () => {
       setSaleId(savedSale.id);
       setIsFinished(true);
       setIsWaitingForMP(false);
+      
+      // Dynamic database-backed salesCount increment
+      const currentAuth = useAuthStore.getState();
+      if (currentAuth.user) {
+        currentAuth.setAuth({
+          ...currentAuth.user,
+          salesCount: (currentAuth.user.salesCount || 0) + 1
+        }, currentAuth.token || '');
+      }
+      
       useSettingsStore.getState().incrementSales();
     } catch (error) {
       console.error('Error finalizando la venta:', error);
