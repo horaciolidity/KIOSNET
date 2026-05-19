@@ -86,7 +86,12 @@ export const createMpPreference = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error creating Mercado Pago Preference:', error);
-    res.status(500).json({ message: 'Error al iniciar pago con Mercado Pago', error: error.message });
+    const details = error.response?.data || error.cause || null;
+    res.status(500).json({ 
+      message: 'Error al iniciar pago con Mercado Pago', 
+      error: error.message,
+      details
+    });
   }
 };
 
@@ -149,7 +154,12 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
     });
   } catch (error: any) {
     console.error('Error creating subscription preference:', error);
-    res.status(500).json({ message: 'Error al iniciar suscripción', error: error.message });
+    const details = error.response?.data || error.cause || null;
+    res.status(500).json({ 
+      message: 'Error al iniciar suscripción', 
+      error: error.message,
+      details
+    });
   }
 };
 

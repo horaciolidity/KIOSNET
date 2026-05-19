@@ -29,7 +29,7 @@ const login = async (req, res) => {
                 const newTenant = await tx.tenant.create({
                     data: {
                         name: storeName,
-                        plan: 'PRO',
+                        plan: 'FREE',
                         subActive: false, // Needs subscription activation!
                     }
                 });
@@ -81,8 +81,21 @@ const login = async (req, res) => {
         if (!user || !user.active) {
             return res.status(401).json({ message: 'Esta cuenta se encuentra inactiva' });
         }
+        // Dynamic subscription expiration check on login
+        let subActive = user.tenant.subActive;
+        if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+            await prisma_1.default.tenant.update({
+                where: { id: user.tenantId },
+                data: { subActive: false }
+            });
+            user.tenant.subActive = false;
+            subActive = false;
+        }
         // 4. Issue JWT Access Token
         const token = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET || 'your_super_secret_jwt_key_change_this', { expiresIn: '1d' });
+        const salesCount = await prisma_1.default.sale.count({
+            where: { tenantId: user.tenantId }
+        });
         res.json({
             message: autoRegistered
                 ? '¡Comercio creado y registrado con éxito!'
@@ -94,7 +107,9 @@ const login = async (req, res) => {
                 role: user.role,
                 tenantId: user.tenantId,
                 plan: user.tenant.plan,
-                subActive: user.tenant.subActive,
+                subActive: subActive,
+                subExpiresAt: user.tenant.subExpiresAt,
+                salesCount: salesCount
             },
             token,
             autoRegistered
@@ -123,7 +138,7 @@ const register = async (req, res) => {
             const tenant = await tx.tenant.create({
                 data: {
                     name: storeName,
-                    plan: 'PRO',
+                    plan: 'FREE',
                     subActive: false,
                 }
             });
@@ -164,6 +179,8 @@ const register = async (req, res) => {
                 tenantId: result.user.tenantId,
                 plan: result.tenant.plan,
                 subActive: result.tenant.subActive,
+                subExpiresAt: result.tenant.subExpiresAt,
+                salesCount: 0
             }
         });
     }
@@ -183,6 +200,19 @@ const getCurrentUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
+        // Dynamic subscription expiration check
+        let subActive = user.tenant.subActive;
+        if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+            await prisma_1.default.tenant.update({
+                where: { id: user.tenantId },
+                data: { subActive: false }
+            });
+            user.tenant.subActive = false;
+            subActive = false;
+        }
+        const salesCount = await prisma_1.default.sale.count({
+            where: { tenantId: user.tenantId }
+        });
         res.json({
             user: {
                 id: user.id,
@@ -191,7 +221,9 @@ const getCurrentUser = async (req, res) => {
                 role: user.role,
                 tenantId: user.tenantId,
                 plan: user.tenant.plan,
-                subActive: user.tenant.subActive,
+                subActive: subActive,
+                subExpiresAt: user.tenant.subExpiresAt,
+                salesCount: salesCount
             }
         });
     }

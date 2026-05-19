@@ -18,6 +18,7 @@ const customer_routes_1 = __importDefault(require("./routes/customer.routes"));
 const category_routes_1 = __importDefault(require("./routes/category.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
+const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const auth_middleware_1 = require("./middlewares/auth.middleware");
 const prisma_1 = __importDefault(require("./utils/prisma"));
 exports.prisma = prisma_1.default;
@@ -39,6 +40,7 @@ app.use('/api/customers', auth_middleware_1.authMiddleware, customer_routes_1.de
 app.use('/api/categories', auth_middleware_1.authMiddleware, category_routes_1.default);
 app.use('/api/notifications', auth_middleware_1.authMiddleware, notification_routes_1.default);
 app.use('/api/payments', payment_routes_1.default); // Route-level protection inside payment.routes.ts to keep webhook public
+app.use('/api/admin', auth_middleware_1.authMiddleware, admin_routes_1.default);
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'POS System API is running' });
 });

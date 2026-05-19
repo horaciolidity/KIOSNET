@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleMpWebhook = exports.createMpSubscriptionPreference = exports.createMpPreference = void 0;
+exports.getPlanPrices = exports.handleMpWebhook = exports.createMpSubscriptionPreference = exports.createMpPreference = void 0;
 const mercadopago_1 = require("mercadopago");
 const prisma_1 = __importDefault(require("../utils/prisma"));
 // Initialize Mercado Pago Client
@@ -76,7 +76,12 @@ const createMpPreference = async (req, res) => {
     }
     catch (error) {
         console.error('Error creating Mercado Pago Preference:', error);
-        res.status(500).json({ message: 'Error al iniciar pago con Mercado Pago', error: error.message });
+        const details = error.response?.data || error.cause || null;
+        res.status(500).json({
+            message: 'Error al iniciar pago con Mercado Pago',
+            error: error.message,
+            details
+        });
     }
 };
 exports.createMpPreference = createMpPreference;
@@ -87,19 +92,33 @@ const createMpSubscriptionPreference = async (req, res) => {
         if (!tenantId) {
             return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
         }
+        const { plan } = req.body; // 'STANDARD' or 'PRO'
+        if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
+            return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
+        }
+        // Query dynamic pricing from SystemConfig
+        const configPrices = await prisma_1.default.systemConfig.findMany();
+        let price = plan === 'PRO' ? 15730 : 12320;
+        configPrices.forEach(cfg => {
+            if (plan === 'PRO' && cfg.key === 'price_pro')
+                price = Number(cfg.value) || 15730;
+            if (plan === 'STANDARD' && cfg.key === 'price_standard')
+                price = Number(cfg.value) || 12320;
+        });
+        const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
+        const planId = plan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
         const client = getMpClient();
         const preference = new mercadopago_1.Preference(client);
         const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
         const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
-        // Monthly subscription price of $5000 ARS
         const response = await preference.create({
             body: {
                 items: [
                     {
-                        id: 'kiosnet_subscription_pro',
-                        title: 'Suscripción KIOSNET Pro (Mensual)',
+                        id: planId,
+                        title: title,
                         quantity: 1,
-                        unit_price: 5000,
+                        unit_price: price,
                         currency_id: 'ARS'
                     }
                 ],
@@ -110,7 +129,7 @@ const createMpSubscriptionPreference = async (req, res) => {
                 },
                 auto_return: 'approved',
                 notification_url: notificationUrl,
-                external_reference: `sub_${tenantId}` // Prefixed with sub_ to mark it as subscription pay!
+                external_reference: `sub_${plan}_${tenantId}` // Prefixed with sub_PLAN_ to detect plan on webhook!
             }
         });
         res.json({
@@ -120,7 +139,12 @@ const createMpSubscriptionPreference = async (req, res) => {
     }
     catch (error) {
         console.error('Error creating subscription preference:', error);
-        res.status(500).json({ message: 'Error al iniciar suscripción', error: error.message });
+        const details = error.response?.data || error.cause || null;
+        res.status(500).json({
+            message: 'Error al iniciar suscripción',
+            error: error.message,
+            details
+        });
     }
 };
 exports.createMpSubscriptionPreference = createMpSubscriptionPreference;
@@ -141,15 +165,32 @@ const handleMpWebhook = async (req, res) => {
             if (paymentInfo.status === 'approved' && externalRef) {
                 if (externalRef.startsWith('sub_')) {
                     // 1. Process Subscription Payment
-                    const tenantId = externalRef.replace('sub_', '');
+                    let tenantId = '';
+                    let plan = 'STANDARD';
+                    if (externalRef.startsWith('sub_PRO_')) {
+                        tenantId = externalRef.replace('sub_PRO_', '');
+                        plan = 'PRO';
+                    }
+                    else if (externalRef.startsWith('sub_STANDARD_')) {
+                        tenantId = externalRef.replace('sub_STANDARD_', '');
+                        plan = 'STANDARD';
+                    }
+                    else {
+                        // Fallback for older subscription references
+                        tenantId = externalRef.replace('sub_', '');
+                        plan = 'PRO';
+                    }
+                    const subExpiresAt = new Date();
+                    subExpiresAt.setMonth(subExpiresAt.getMonth() + 1);
                     await prisma_1.default.tenant.update({
                         where: { id: tenantId },
                         data: {
                             subActive: true,
-                            plan: 'PRO'
+                            plan: plan,
+                            subExpiresAt: subExpiresAt
                         }
                     });
-                    console.log(`Tenant ${tenantId} subscription set to active (PRO Plan).`);
+                    console.log(`Tenant ${tenantId} subscription set to active (${plan} Plan).`);
                 }
                 else {
                     // 2. Process Standard Sale Payment
@@ -196,11 +237,34 @@ const handleMpWebhook = async (req, res) => {
                 }
             }
         }
-        res.status(200).send('OK');
+        res.sendStatus(200);
     }
     catch (error) {
-        console.error('Error handling Mercado Pago Webhook:', error);
-        res.status(200).send('OK');
+        console.error('Error handling Mercado Pago webhook:', error);
+        res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
 exports.handleMpWebhook = handleMpWebhook;
+// GET /api/payments/prices
+const getPlanPrices = async (req, res) => {
+    try {
+        const configPrices = await prisma_1.default.systemConfig.findMany();
+        let priceStandard = 12320;
+        let pricePro = 15730;
+        configPrices.forEach(cfg => {
+            if (cfg.key === 'price_standard')
+                priceStandard = Number(cfg.value) || 12320;
+            if (cfg.key === 'price_pro')
+                pricePro = Number(cfg.value) || 15730;
+        });
+        res.json({
+            price_standard: priceStandard,
+            price_pro: pricePro
+        });
+    }
+    catch (error) {
+        console.error('Error getting plan prices:', error);
+        res.status(500).json({ message: 'Error al obtener los precios de los planes.' });
+    }
+};
+exports.getPlanPrices = getPlanPrices;

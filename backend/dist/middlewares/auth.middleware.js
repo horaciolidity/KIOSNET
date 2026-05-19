@@ -21,6 +21,15 @@ const authMiddleware = async (req, res, next) => {
         if (!user || !user.active) {
             return res.status(401).json({ message: 'Usuario no encontrado o inactivo.' });
         }
+        let subActive = user.tenant.subActive;
+        if (subActive && user.tenant.subExpiresAt && user.tenant.subExpiresAt < new Date()) {
+            // Auto-expire subscription dynamically in DB
+            await prisma_1.default.tenant.update({
+                where: { id: user.tenantId },
+                data: { subActive: false }
+            });
+            subActive = false;
+        }
         req.user = {
             id: user.id,
             email: user.email,
@@ -28,7 +37,8 @@ const authMiddleware = async (req, res, next) => {
             role: user.role,
             tenantId: user.tenantId,
             plan: user.tenant.plan,
-            subActive: user.tenant.subActive,
+            subActive: subActive,
+            subExpiresAt: user.tenant.subExpiresAt,
         };
         next();
     }

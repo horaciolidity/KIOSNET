@@ -12,6 +12,15 @@ const createSale = async (req, res) => {
         if (!tenantId) {
             return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
         }
+        // SaaS Multitenant billing blocker: Block creating sales if the tenant has >= 50 sales and no active subscription
+        const salesCount = await prisma_1.default.sale.count({
+            where: { tenantId }
+        });
+        if (!authReq.user?.subActive && salesCount >= 50) {
+            return res.status(403).json({
+                message: 'Límite de ventas gratuitas (50 ventas) alcanzado. Por favor, activa tu suscripción en Configuración para continuar realizando ventas.'
+            });
+        }
         const { total, subtotal, discount, paymentMethod, customerId, sellerId, items, receivedAmount, changeAmount } = req.body;
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'No se puede procesar una venta vacía' });
