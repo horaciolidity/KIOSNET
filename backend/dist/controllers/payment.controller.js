@@ -8,7 +8,7 @@ const mercadopago_1 = require("mercadopago");
 const prisma_1 = __importDefault(require("../utils/prisma"));
 // Initialize Mercado Pago Client
 const getMpClient = () => {
-    const token = process.env.MP_ACCESS_TOKEN || 'TEST-64a388b6-9977-488e-840e-c02bc9041fc4';
+    const token = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
     return new mercadopago_1.MercadoPagoConfig({
         accessToken: token,
         options: { timeout: 5000 }
