@@ -17,7 +17,8 @@ import {
   QrCode,
   X,
   Lock,
-  Unlock
+  Unlock,
+  Crown
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
@@ -57,7 +59,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       setEnteredPin('');
       setPinError('');
     } else {
-      setIsConfirmModalOpen(true);
+      const isPro = user?.subActive && user?.plan === 'PRO';
+      if (!isPro) {
+        setIsUpgradeModalOpen(true);
+      } else {
+        setIsConfirmModalOpen(true);
+      }
     }
   };
 
@@ -403,6 +410,57 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 Confirmar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suggest Upgrade to PRO Modal */}
+      {isUpgradeModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+            {/* Header banner */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-white/5 opacity-40 mix-blend-overlay"></div>
+              <div className="w-16 h-16 bg-white/10 border border-white/20 text-white rounded-full flex items-center justify-center mx-auto mb-4 relative z-10">
+                <Crown size={32} className="animate-pulse" />
+              </div>
+              <h3 className="text-2xl font-black relative z-10">¡Requiere KIOSNET PRO! 🚀</h3>
+              <p className="text-indigo-100 text-xs font-bold mt-1 relative z-10">Eleva la seguridad y el control de tu comercio</p>
+            </div>
+            
+            <div className="p-8 space-y-6 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-bold">
+                El **Modo Empleado** es una característica exclusiva de la edición **PRO**. Permite ocultar tus ganancias netas, restringir la edición de inventario y proteger la caja diaria para tus cajeros de forma automática.
+              </p>
+
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-left space-y-2">
+                <p className="text-[10px] font-black uppercase text-indigo-500 tracking-wider">Beneficios del Plan PRO</p>
+                <ul className="text-xs text-slate-500 dark:text-slate-400 space-y-2 font-medium">
+                  <li className="flex items-center gap-2">🟢 Ventas mensuales 100% ILIMITADAS</li>
+                  <li className="flex items-center gap-2">🟢 Modo Empleado Configurable por PIN</li>
+                  <li className="flex items-center gap-2">🟢 Pantalla Display interactiva para Clientes</li>
+                  <li className="flex items-center gap-2">🟢 Cobro automático QR Mercado Pago</li>
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button 
+                  onClick={() => setIsUpgradeModalOpen(false)}
+                  className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-4 rounded-2xl font-black text-sm transition-all"
+                >
+                  Tal vez luego
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsUpgradeModalOpen(false);
+                    navigate('/billing?plan=PRO');
+                  }}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white py-4 rounded-2xl font-black text-sm transition-all shadow-xl shadow-indigo-600/20 active:scale-95"
+                >
+                  Actualizar a PRO
+                </button>
+              </div>
             </div>
           </div>
         </div>
