@@ -56,6 +56,7 @@ export const createMpPreference = async (req: any, res: Response) => {
 
     const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
     const mpItems = items.map((item: any) => ({
       id: item.productId,
@@ -65,18 +66,23 @@ export const createMpPreference = async (req: any, res: Response) => {
       currency_id: 'ARS'
     }));
 
+    const preferenceBody: any = {
+      items: mpItems,
+      back_urls: {
+        success: `${frontendUrl}/pos?payment=success`,
+        failure: `${frontendUrl}/pos?payment=failure`,
+        pending: `${frontendUrl}/pos?payment=pending`
+      },
+      notification_url: notificationUrl,
+      external_reference: pendingSale.id // Store our Supabase Sale ID
+    };
+
+    if (frontendUrl.startsWith('https')) {
+      preferenceBody.auto_return = 'approved';
+    }
+
     const response = await preference.create({
-      body: {
-        items: mpItems,
-        back_urls: {
-          success: 'http://localhost:5173/pos?payment=success',
-          failure: 'http://localhost:5173/pos?payment=failure',
-          pending: 'http://localhost:5173/pos?payment=pending'
-        },
-        auto_return: 'approved',
-        notification_url: notificationUrl,
-        external_reference: pendingSale.id // Store our Supabase Sale ID
-      }
+      body: preferenceBody
     });
 
     res.json({
@@ -125,27 +131,33 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
 
     const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const preferenceBody: any = {
+      items: [
+        {
+          id: planId,
+          title: title,
+          quantity: 1,
+          unit_price: price,
+          currency_id: 'ARS'
+        }
+      ],
+      back_urls: {
+        success: `${frontendUrl}/dashboard?sub=success`,
+        failure: `${frontendUrl}/dashboard?sub=failure`,
+        pending: `${frontendUrl}/dashboard?sub=pending`
+      },
+      notification_url: notificationUrl,
+      external_reference: `sub_${plan}_${tenantId}` // Prefixed with sub_PLAN_ to detect plan on webhook!
+    };
+
+    if (frontendUrl.startsWith('https')) {
+      preferenceBody.auto_return = 'approved';
+    }
 
     const response = await preference.create({
-      body: {
-        items: [
-          {
-            id: planId,
-            title: title,
-            quantity: 1,
-            unit_price: price,
-            currency_id: 'ARS'
-          }
-        ],
-        back_urls: {
-          success: 'http://localhost:5173/dashboard?sub=success',
-          failure: 'http://localhost:5173/dashboard?sub=failure',
-          pending: 'http://localhost:5173/dashboard?sub=pending'
-        },
-        auto_return: 'approved',
-        notification_url: notificationUrl,
-        external_reference: `sub_${plan}_${tenantId}` // Prefixed with sub_PLAN_ to detect plan on webhook!
-      }
+      body: preferenceBody
     });
 
     res.json({
