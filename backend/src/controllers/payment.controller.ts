@@ -113,10 +113,12 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
     }
 
-    const { plan } = req.body; // 'STANDARD' or 'PRO'
+    const { plan, months = 1 } = req.body; // 'STANDARD' or 'PRO'
     if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
       return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
     }
+
+    const numMonths = parseInt(months, 10) || 1;
 
     // Query dynamic pricing from SystemConfig
     const configPrices = await prisma.systemConfig.findMany();
@@ -126,7 +128,9 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       if (plan === 'STANDARD' && cfg.key === 'price_standard') price = Number(cfg.value) || 12320;
     });
 
-    const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
+    const finalPrice = price * numMonths;
+
+    const title = plan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
     const planId = plan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
 
     const client = getMpClient();
@@ -144,7 +148,7 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
           id: planId,
           title: title,
           quantity: 1,
-          unit_price: price,
+          unit_price: finalPrice,
           currency_id: 'ARS'
         }
       ],
@@ -154,7 +158,7 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
         pending: `${frontendUrl}/dashboard?sub=pending`
       },
       notification_url: notificationUrl,
-      external_reference: `sub_${plan}_${tenantId}` // Prefixed with sub_PLAN_ to detect plan on webhook!
+      external_reference: `sub_${plan}_${tenantId}_${numMonths}` // Prefixed with sub_PLAN_ to detect plan on webhook!
     };
 
     if (frontendUrl.startsWith('https')) {
@@ -189,10 +193,12 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
       return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
     }
 
-    const { plan } = req.body; // 'STANDARD' or 'PRO'
+    const { plan, months = 1 } = req.body; // 'STANDARD' or 'PRO'
     if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
       return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
     }
+
+    const numMonths = parseInt(months, 10) || 1;
 
     // Query dynamic pricing from SystemConfig
     const configPrices = await prisma.systemConfig.findMany();
@@ -202,7 +208,9 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
       if (plan === 'STANDARD' && cfg.key === 'price_standard') price = Number(cfg.value) || 12320;
     });
 
-    const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
+    const finalPrice = price * numMonths;
+
+    const title = plan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
     const host = req.get('host') || 'kiosnet.onrender.com';
     const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
     const backendUrl = process.env.BACKEND_URL || (isLocalhost ? 'https://kiosnet-webhook.loca.lt' : `https://${host}`);
@@ -210,20 +218,20 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
 
     // Construct order payload for in-store QR/POS API
     const orderBody = {
-      external_reference: `sub_${plan}_${tenantId}`,
+      external_reference: `sub_${plan}_${tenantId}_${numMonths}`,
       title: title,
-      description: `Suscripción Kiosnet ${plan} mensual`,
+      description: `Suscripción Kiosnet ${plan} x${numMonths}`,
       notification_url: notificationUrl,
-      total_amount: price,
+      total_amount: finalPrice,
       items: [
         {
           sku_number: `sub_${plan}`,
           title: title,
-          description: `Suscripción Kiosnet ${plan} mensual`,
-          unit_price: price,
+          description: `Suscripción Kiosnet ${plan} x${numMonths}`,
+          unit_price: finalPrice,
           quantity: 1,
           unit_measure: 'unit',
-          total_amount: price
+          total_amount: finalPrice
         }
       ]
     };
@@ -302,28 +310,38 @@ export const handleMpWebhook = async (req: Request, res: Response) => {
           // 1. Process Subscription Payment
           let tenantId = '';
           let plan = 'STANDARD';
+          let months = 1;
           
-          if (externalRef.startsWith('sub_PRO_')) {
-            tenantId = externalRef.replace('sub_PRO_', '');
-            plan = 'PRO';
-          } else if (externalRef.startsWith('sub_STANDARD_')) {
-            tenantId = externalRef.replace('sub_STANDARD_', '');
-            plan = 'STANDARD';
+          if (externalRef.startsWith('sub_PRO_') || externalRef.startsWith('sub_STANDARD_')) {
+            const parts = externalRef.split('_');
+            // Format: sub_PRO_tenantId_months
+            plan = parts[1];
+            tenantId = parts[2];
+            if (parts.length > 3) {
+              months = parseInt(parts[3], 10) || 1;
+            }
           } else {
             // Fallback for older subscription references
             tenantId = externalRef.replace('sub_', '');
             plan = 'PRO';
           }
           
-          const subExpiresAt = new Date();
-          subExpiresAt.setMonth(subExpiresAt.getMonth() + 1);
+          const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+          
+          let baseDate = new Date();
+          // If already active and hasn't expired, append to existing expiration!
+          if (tenant?.subActive && tenant.subExpiresAt && tenant.subExpiresAt > new Date()) {
+            baseDate = new Date(tenant.subExpiresAt);
+          }
+          
+          baseDate.setMonth(baseDate.getMonth() + months);
 
           await prisma.tenant.update({
             where: { id: tenantId },
             data: {
               subActive: true,
               plan: plan,
-              subExpiresAt: subExpiresAt
+              subExpiresAt: baseDate
             }
           });
 

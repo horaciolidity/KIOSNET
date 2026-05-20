@@ -15,6 +15,7 @@ const SubscriptionPay: React.FC = () => {
   const [qrLoading, setQrLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
+  const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
 
   // Parse search params to pre-select plan & fetch prices
@@ -66,7 +67,10 @@ const SubscriptionPay: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/payments/mercadopago/subscription', { plan: selectedPlan });
+      const response = await api.post('/payments/mercadopago/subscription', { 
+        plan: selectedPlan, 
+        months: selectedMonths 
+      });
       const { initPoint } = response.data;
       
       // Open the Mercado Pago Checkout link in a new tab
@@ -84,7 +88,11 @@ const SubscriptionPay: React.FC = () => {
     setQrLoading(true);
     setError('');
     try {
-      const response = await api.post('/payments/mercadopago/subscription-qr', { plan: selectedPlan });
+      const response = await api.post('/payments/mercadopago/subscription-qr', { 
+        plan: selectedPlan, 
+        months: selectedMonths 
+      });
+      
       if (response.data.success && response.data.qrImage) {
         setQrImageUrl(response.data.qrImage);
         setPaymentOpened(true);
@@ -313,11 +321,49 @@ const SubscriptionPay: React.FC = () => {
 
         {/* Action Button & Disclaimer */}
         {!paymentOpened ? (
-          <div className="mt-8 max-w-xl mx-auto text-center space-y-4">
-            <button
-              onClick={handlePaySubscription}
-              disabled={loading || qrLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 disabled:opacity-70 group cursor-pointer text-base uppercase tracking-wider"
+          <div className="mt-8 max-w-xl mx-auto text-center space-y-6">
+            
+            {/* Months Selector */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-left">
+                <h4 className="text-white font-medium">Duración de la suscripción</h4>
+                <p className="text-slate-400 text-sm">Paga más meses juntos y asegura tu acceso</p>
+              </div>
+              <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
+                {[1, 3, 6, 12].map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setSelectedMonths(m)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      selectedMonths === m 
+                        ? 'bg-indigo-500 text-white shadow-md' 
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {m} {m === 1 ? 'Mes' : 'Meses'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/50 rounded-2xl p-4 border border-white/10 flex justify-between items-center text-left">
+              <div>
+                <p className="text-slate-400 text-sm">Total a pagar</p>
+                <p className="text-white font-bold text-xl">
+                  ${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-slate-400 text-sm">Plan Seleccionado</p>
+                <p className="text-indigo-400 font-bold uppercase">{selectedPlan} x{selectedMonths}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <button
+                onClick={handlePaySubscription}
+                disabled={loading || qrLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 disabled:opacity-70 group cursor-pointer text-base uppercase tracking-wider"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
