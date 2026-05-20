@@ -55,7 +55,9 @@ export const createMpPreference = async (req: any, res: Response) => {
     const client = getMpClient();
     const preference = new Preference(client);
 
-    const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
+    const host = req.get('host') || 'kiosnet.onrender.com';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    const backendUrl = process.env.BACKEND_URL || (isLocalhost ? 'https://kiosnet-webhook.loca.lt' : `https://${host}`);
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -130,7 +132,9 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
     const client = getMpClient();
     const preference = new Preference(client);
 
-    const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
+    const host = req.get('host') || 'kiosnet.onrender.com';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    const backendUrl = process.env.BACKEND_URL || (isLocalhost ? 'https://kiosnet-webhook.loca.lt' : `https://${host}`);
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -199,7 +203,9 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
     });
 
     const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
-    const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
+    const host = req.get('host') || 'kiosnet.onrender.com';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    const backendUrl = process.env.BACKEND_URL || (isLocalhost ? 'https://kiosnet-webhook.loca.lt' : `https://${host}`);
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
 
     // Construct order payload for in-store QR/POS API
