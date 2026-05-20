@@ -104,12 +104,7 @@ const Settings: React.FC = () => {
             active={activeSection === 'plan'} 
             onClick={() => setActiveSection('plan')}
           />
-          <NavButton 
-            icon={<QrCode size={20} />} 
-            title="Integraciones API" 
-            active={activeSection === 'api'} 
-            onClick={() => setActiveSection('api')}
-          />
+
 
         </div>
 
@@ -315,55 +310,7 @@ const Settings: React.FC = () => {
                   </div>
                 )}
 
-                {activeSection === 'api' && (
-                  <div className="relative min-h-[300px] animate-in fade-in duration-300">
-                    {/* Locked Overlay for Free/Standard users */}
-                    {!(user?.subActive && user?.plan === 'PRO') && (
-                      <div className="absolute inset-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-8 text-center rounded-[32px]">
-                        <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4 animate-bounce">
-                          <QrCode size={32} />
-                        </div>
-                        <h4 className="text-xl font-black text-slate-900 dark:text-white">Cobro por QR de Mercado Pago (PRO)</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-2 leading-relaxed">
-                          La integración automatizada con códigos QR de Mercado Pago en tu POS requiere una suscripción **PRO** activa.
-                        </p>
-                        <button 
-                          onClick={() => setActiveSection('plan')}
-                          className="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider px-6 py-3.5 rounded-2xl transition-all shadow-lg shadow-blue-600/20"
-                        >
-                          Actualizar a Plan PRO
-                        </button>
-                      </div>
-                    )}
 
-                    <div className="space-y-6">
-                      <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4 flex items-center gap-2">
-                        <QrCode className="text-blue-600" /> Mercado Pago (QR Dinámico)
-                      </h3>
-                      <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-500/20 text-sm text-blue-800 dark:text-blue-300 mb-6 font-medium">
-                        Configura tu cuenta de Mercado Pago para generar cobros automáticos mediante código QR en tu mostrador o pantalla display.
-                      </div>
-                      <div className="space-y-4">
-                        <Toggle 
-                          label="Activar Cobro por QR en POS" 
-                          description="Habilita la opción de cobrar con QR dinámico de Mercado Pago en la pantalla de ventas."
-                          checked={businessInfo.mercadoPago?.isActive || false}
-                          onChange={(val: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, isActive: val } })}
-                        />
-                        <Input 
-                          label="Access Token (Producción)" 
-                          value={businessInfo.mercadoPago?.accessToken || ''} 
-                          onChange={(e: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, accessToken: e.target.value } })} 
-                        />
-                        <Input 
-                          label="ID de Caja (POS ID)" 
-                          value={businessInfo.mercadoPago?.posId || ''} 
-                          onChange={(e: any) => updateBusinessInfo({ mercadoPago: { ...businessInfo.mercadoPago, posId: e.target.value } })} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
 
               </div>
