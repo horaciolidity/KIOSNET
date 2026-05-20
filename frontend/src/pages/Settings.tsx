@@ -9,8 +9,7 @@ import {
   Store, 
   ChevronRight,
   Save,
-  CheckCircle2,
-  QrCode
+  CheckCircle2
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAuthStore } from '../store/useAuthStore';
