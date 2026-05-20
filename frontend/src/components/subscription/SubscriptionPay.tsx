@@ -391,6 +391,7 @@ const SubscriptionPay: React.FC = () => {
             <p className="text-xs text-slate-500">
               Abona de forma segura mediante Mercado Pago. La activación de tu cuenta será automática e inmediata.
             </p>
+            </div>
           </div>
         ) : (
           <div className="mt-8 max-w-md mx-auto bg-slate-900/90 border border-white/10 rounded-3xl p-8 text-center space-y-6 flex flex-col items-center shadow-2xl backdrop-blur-xl">
