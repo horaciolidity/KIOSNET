@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { request } from 'https';
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import prisma from '../utils/prisma';
@@ -171,6 +172,101 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       message: 'Error al iniciar suscripción', 
       error: error.message,
       details
+    });
+  }
+};
+
+export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
+    }
+
+    const { plan } = req.body; // 'STANDARD' or 'PRO'
+    if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
+      return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
+    }
+
+    // Query dynamic pricing from SystemConfig
+    const configPrices = await prisma.systemConfig.findMany();
+    let price = plan === 'PRO' ? 15730 : 12320;
+    configPrices.forEach(cfg => {
+      if (plan === 'PRO' && cfg.key === 'price_pro') price = Number(cfg.value) || 15730;
+      if (plan === 'STANDARD' && cfg.key === 'price_standard') price = Number(cfg.value) || 12320;
+    });
+
+    const title = plan === 'PRO' ? 'Suscripción KIOSNET Pro (Mensual)' : 'Suscripción KIOSNET Estándar (Mensual)';
+    const backendUrl = process.env.BACKEND_URL || 'https://kiosnet-webhook.loca.lt';
+    const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
+
+    // Construct order payload for in-store QR/POS API
+    const orderBody = {
+      external_reference: `sub_${plan}_${tenantId}`,
+      title: title,
+      description: `Suscripción Kiosnet ${plan} mensual`,
+      notification_url: notificationUrl,
+      total_amount: price,
+      items: [
+        {
+          sku_number: `sub_${plan}`,
+          title: title,
+          description: `Suscripción Kiosnet ${plan} mensual`,
+          unit_price: price,
+          quantity: 1,
+          unit_measure: 'unit',
+          total_amount: price
+        }
+      ]
+    };
+
+    const postData = JSON.stringify(orderBody);
+    const mpToken = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+    const userId = '345296566';
+    const externalPosId = 'kiosnetpos01';
+
+    const options = {
+      hostname: 'api.mercadopago.com',
+      path: `/instore/qr/seller/collectors/${userId}/pos/${externalPosId}/orders`,
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${mpToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const apiReq = request(options, (apiRes) => {
+        let data = '';
+        apiRes.on('data', (chunk) => data += chunk);
+        apiRes.on('end', () => {
+          if (apiRes.statusCode === 204 || apiRes.statusCode === 200 || apiRes.statusCode === 201) {
+            resolve();
+          } else {
+            console.error('Mercado Pago QR Order API Error:', apiRes.statusCode, data);
+            reject(new Error(`Mercado Pago API returned status ${apiRes.statusCode}: ${data}`));
+          }
+        });
+      });
+
+      apiReq.on('error', (e) => reject(e));
+      apiReq.write(postData);
+      apiReq.end();
+    });
+
+    res.json({
+      success: true,
+      qrImage: 'https://www.mercadopago.com/instore/merchant/qr/132222299/4ce13379bb0c4a7eb715001e25aeda82b3ccf950f24d479badd3bd0426b5f768.png',
+      qrCode: '00020101021143540016com.mercadolibre0130https://mpago.la/pos/13222229950150011233098854495204970053030325802AR5910EconoFeria6004CABA63041406'
+    });
+  } catch (error: any) {
+    console.error('Error creating QR order:', error);
+    res.status(500).json({ 
+      message: 'Error al iniciar pago QR con Mercado Pago', 
+      error: error.message
     });
   }
 };

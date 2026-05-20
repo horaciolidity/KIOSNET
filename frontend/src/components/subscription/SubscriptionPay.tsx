@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap, ArrowLeft } from 'lucide-react';
+import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap, ArrowLeft, QrCode } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../utils/api';
 
@@ -11,6 +11,8 @@ const SubscriptionPay: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [paymentOpened, setPaymentOpened] = useState(false);
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
@@ -75,6 +77,23 @@ const SubscriptionPay: React.FC = () => {
       setError(err.response?.data?.message || 'Error al conectar con Mercado Pago. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePayQR = async () => {
+    setQrLoading(true);
+    setError('');
+    try {
+      const response = await api.post('/payments/mercadopago/subscription-qr', { plan: selectedPlan });
+      if (response.data.success && response.data.qrImage) {
+        setQrImageUrl(response.data.qrImage);
+        setPaymentOpened(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Error al generar QR. Inténtalo de nuevo.');
+    } finally {
+      setQrLoading(false);
     }
   };
 
@@ -297,7 +316,7 @@ const SubscriptionPay: React.FC = () => {
           <div className="mt-8 max-w-xl mx-auto text-center space-y-4">
             <button
               onClick={handlePaySubscription}
-              disabled={loading}
+              disabled={loading || qrLoading}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 disabled:opacity-70 group cursor-pointer text-base uppercase tracking-wider"
             >
               {loading ? (
@@ -305,25 +324,49 @@ const SubscriptionPay: React.FC = () => {
               ) : (
                 <>
                   <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  Activar Plan {selectedPlan === 'PRO' ? 'Pro' : 'Estándar'} con Mercado Pago
+                  Activar Plan {selectedPlan === 'PRO' ? 'Pro' : 'Estándar'}
+                </>
+              )}
+            </button>
+            <button
+              onClick={handlePayQR}
+              disabled={loading || qrLoading}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 disabled:opacity-70 group cursor-pointer text-base uppercase tracking-wider"
+            >
+              {qrLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-400" />
+                  Pagar con QR en Pantalla
                 </>
               )}
             </button>
             <p className="text-xs text-slate-500">
-              Serás redirigido de forma segura a Mercado Pago para realizar la activación mensual del POS en tu cuenta.
+              Abona de forma segura mediante Mercado Pago. La activación de tu cuenta será automática e inmediata.
             </p>
           </div>
         ) : (
           <div className="mt-8 max-w-md mx-auto bg-slate-900/90 border border-white/10 rounded-3xl p-8 text-center space-y-6 flex flex-col items-center shadow-2xl backdrop-blur-xl">
-            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-2 relative">
-              <div className="absolute inset-0 rounded-full border border-blue-500/40 animate-ping opacity-75"></div>
-              <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-            </div>
+            {qrImageUrl ? (
+              <div className="flex flex-col items-center">
+                <h3 className="text-xl font-bold mb-2">Escanea para pagar</h3>
+                <p className="text-sm text-slate-400 mb-6">Abre la app de Mercado Pago y escanea este código QR</p>
+                <div className="bg-white p-4 rounded-2xl shadow-xl shadow-blue-500/10 mb-6">
+                  <img src={qrImageUrl} alt="Mercado Pago QR Code" className="w-48 h-48 object-contain" />
+                </div>
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-2 relative">
+                <div className="absolute inset-0 rounded-full border border-blue-500/40 animate-ping opacity-75"></div>
+                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+              </div>
+            )}
 
             <div>
               <h3 className="text-lg font-bold">Esperando confirmación...</h3>
               <p className="text-slate-400 text-xs leading-relaxed mt-2 px-4">
-                Completando pago del **Plan {selectedPlan === 'PRO' ? 'Pro' : 'Estándar'}** en Mercado Pago... Una vez acreditado, KIOSNET se desbloqueará de forma automática en tu pantalla.
+                Una vez acreditado el pago del **Plan {selectedPlan === 'PRO' ? 'Pro' : 'Estándar'}**, KIOSNET se desbloqueará de forma automática.
               </p>
             </div>
 
@@ -344,10 +387,13 @@ const SubscriptionPay: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setPaymentOpened(false)}
+                onClick={() => {
+                  setPaymentOpened(false);
+                  setQrImageUrl(null);
+                }}
                 className="w-full bg-transparent hover:bg-white/5 text-slate-400 hover:text-white font-medium py-2 rounded-xl transition-all text-xs cursor-pointer"
               >
-                Cambiar de plan / reintentar
+                Cancelar o Cambiar método de pago
               </button>
             </div>
           </div>
