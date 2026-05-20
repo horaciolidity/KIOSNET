@@ -265,21 +265,9 @@ const getPlanPrices = async (req, res) => {
             if (cfg.key === 'price_pro')
                 pricePro = Number(cfg.value) || 15730;
         });
-        const mpToken = process.env.MP_ACCESS_TOKEN || 'fallback';
-        const tokenInfo = {
-            length: mpToken.length,
-            prefix: mpToken.substring(0, 7),
-            isFallback: mpToken === 'fallback' || mpToken.startsWith('TEST-64a388b')
-        };
         res.json({
             price_standard: priceStandard,
-            price_pro: pricePro,
-            debug: {
-                FRONTEND_URL: process.env.FRONTEND_URL || 'undefined',
-                BACKEND_URL: process.env.BACKEND_URL || 'undefined',
-                NODE_ENV: process.env.NODE_ENV || 'undefined',
-                tokenInfo
-            }
+            price_pro: pricePro
         });
     }
     catch (error) {
