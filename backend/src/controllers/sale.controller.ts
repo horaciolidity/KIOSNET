@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import prisma from '../utils/prisma';
 
@@ -151,11 +152,74 @@ export const getSaleStatus = async (req: any, res: Response) => {
 
     const sale = await prisma.sale.findFirst({
       where: { id, tenantId },
-      select: { status: true }
+      include: { items: true }
     });
     
     if (!sale) {
       return res.status(404).json({ message: 'Venta no encontrada en tu comercio' });
+    }
+    
+    // If it's still pending in our database, actively query Mercado Pago to verify
+    if (sale.status === 'PENDING') {
+      try {
+        const token = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+        const client = new MercadoPagoConfig({
+          accessToken: token,
+          options: { timeout: 5000 }
+        });
+        
+        const payment = new Payment(client);
+        const searchResponse = await payment.search({
+          options: {
+            external_reference: id
+          }
+        });
+        
+        const approvedPayment = searchResponse.results?.find(p => p.status === 'approved');
+        if (approvedPayment) {
+          // Process the sale approval (same transaction logic as webhook!)
+          await prisma.$transaction(async (tx) => {
+            // Mark sale as completed
+            await tx.sale.update({
+              where: { id },
+              data: { status: 'COMPLETED' }
+            });
+
+            // Decrement physical stock
+            for (const item of sale.items) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  stock: {
+                    decrement: item.quantity
+                  }
+                }
+              });
+            }
+
+            // Register cash movement
+            const activeRegister = await tx.cashRegister.findFirst({
+              where: { userId: sale.sellerId, status: 'OPEN', tenantId }
+            });
+
+            if (activeRegister) {
+              await tx.cashMovement.create({
+                data: {
+                  registerId: activeRegister.id,
+                  amount: sale.total,
+                  type: 'IN',
+                  description: `Venta MP QR #${id} [Aprobada - Consulta Directa]`
+                }
+              });
+            }
+          });
+          
+          console.log(`Sale ${id} successfully approved via active MP status check.`);
+          return res.json({ status: 'COMPLETED' });
+        }
+      } catch (mpError) {
+        console.error('Error checking payment status in Mercado Pago:', mpError);
+      }
     }
     
     res.json({ status: sale.status });

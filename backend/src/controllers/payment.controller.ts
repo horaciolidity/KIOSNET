@@ -80,9 +80,7 @@ export const createMpPreference = async (req: any, res: Response) => {
       external_reference: pendingSale.id // Store our Supabase Sale ID
     };
 
-    if (frontendUrl.startsWith('https')) {
-      preferenceBody.auto_return = 'approved';
-    }
+    preferenceBody.auto_return = 'approved';
 
     const response = await preference.create({
       body: preferenceBody
@@ -161,9 +159,7 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       external_reference: `sub_${plan}_${tenantId}_${numMonths}` // Prefixed with sub_PLAN_ to detect plan on webhook!
     };
 
-    if (frontendUrl.startsWith('https')) {
-      preferenceBody.auto_return = 'approved';
-    }
+    preferenceBody.auto_return = 'approved';
 
     const response = await preference.create({
       body: preferenceBody
@@ -211,73 +207,52 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
     const finalPrice = price * numMonths;
 
     const title = plan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
+    const planId = plan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+
+    const client = getMpClient();
+    const preference = new Preference(client);
+
     const host = req.get('host') || 'kiosnet.onrender.com';
     const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
     const backendUrl = process.env.BACKEND_URL || (isLocalhost ? 'https://kiosnet-webhook.loca.lt' : `https://${host}`);
     const notificationUrl = `${backendUrl}/api/payments/mercadopago/webhook`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-    // Construct order payload for in-store QR/POS API
-    const orderBody = {
-      external_reference: `sub_${plan}_${tenantId}_${numMonths}`,
-      title: title,
-      description: `Suscripción Kiosnet ${plan} x${numMonths}`,
-      notification_url: notificationUrl,
-      total_amount: finalPrice,
+    const preferenceBody: any = {
       items: [
         {
-          sku_number: `sub_${plan}`,
+          id: planId,
           title: title,
-          description: `Suscripción Kiosnet ${plan} x${numMonths}`,
-          unit_price: finalPrice,
           quantity: 1,
-          unit_measure: 'unit',
-          total_amount: finalPrice
+          unit_price: finalPrice,
+          currency_id: 'ARS'
         }
-      ]
+      ],
+      back_urls: {
+        success: `${frontendUrl}/dashboard?sub=success`,
+        failure: `${frontendUrl}/dashboard?sub=failure`,
+        pending: `${frontendUrl}/dashboard?sub=pending`
+      },
+      notification_url: notificationUrl,
+      external_reference: `sub_${plan}_${tenantId}_${numMonths}`
     };
 
-    const postData = JSON.stringify(orderBody);
-    const mpToken = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
-    const userId = '345296566';
-    const externalPosId = 'kiosnetpos01';
+    preferenceBody.auto_return = 'approved';
 
-    const options = {
-      hostname: 'api.mercadopago.com',
-      path: `/instore/qr/seller/collectors/${userId}/pos/${externalPosId}/orders`,
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${mpToken}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-
-    await new Promise<void>((resolve, reject) => {
-      const apiReq = request(options, (apiRes) => {
-        let data = '';
-        apiRes.on('data', (chunk) => data += chunk);
-        apiRes.on('end', () => {
-          if (apiRes.statusCode === 204 || apiRes.statusCode === 200 || apiRes.statusCode === 201) {
-            resolve();
-          } else {
-            console.error('Mercado Pago QR Order API Error:', apiRes.statusCode, data);
-            reject(new Error(`Mercado Pago API returned status ${apiRes.statusCode}: ${data}`));
-          }
-        });
-      });
-
-      apiReq.on('error', (e) => reject(e));
-      apiReq.write(postData);
-      apiReq.end();
+    const response = await preference.create({
+      body: preferenceBody
     });
+
+    const initPoint = response.init_point;
+    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint || '')}`;
 
     res.json({
       success: true,
-      qrImage: 'https://www.mercadopago.com/instore/merchant/qr/132222299/4ce13379bb0c4a7eb715001e25aeda82b3ccf950f24d479badd3bd0426b5f768.png',
-      qrCode: '00020101021143540016com.mercadolibre0130https://mpago.la/pos/13222229950150011233098854495204970053030325802AR5910EconoFeria6004CABA63041406'
+      qrImage: qrImage,
+      qrCode: initPoint
     });
   } catch (error: any) {
-    console.error('Error creating QR order:', error);
+    console.error('Error creating subscription QR order preference:', error);
     res.status(500).json({ 
       message: 'Error al iniciar pago QR con Mercado Pago', 
       error: error.message
@@ -288,11 +263,12 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
 export const handleMpWebhook = async (req: Request, res: Response) => {
   try {
     const { action, type, data } = req.body;
-    console.log(`Mercado Pago IPN Webhook received: ${type} - ${action}`, req.body);
+    const topic = type || req.query.topic || req.query.type;
+    console.log(`Mercado Pago IPN Webhook received. Body:`, req.body, `Query:`, req.query);
 
-    let paymentId = data?.id || req.query.id as string;
+    let paymentId = data?.id || (req.query.id as string);
     
-    if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
+    if (topic === 'payment' || action === 'payment.created' || action === 'payment.updated') {
       if (!paymentId) {
         return res.status(400).json({ message: 'No payment ID found in webhook' });
       }
@@ -402,6 +378,117 @@ export const handleMpWebhook = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error handling Mercado Pago webhook:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+export const checkMpSubscriptionStatus = async (req: any, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const tenantId = authReq.user?.tenantId;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
+    }
+
+    const { plan, months } = req.body;
+    
+    // We will build a list of external references to check, prioritizing the one requested
+    const referencesToCheck = new Set<string>();
+    if (plan && months) {
+      referencesToCheck.add(`sub_${plan}_${tenantId}_${months}`);
+    }
+    
+    // Also add fallback combinations in case they clicked another plan/duration
+    const plans = ['PRO', 'STANDARD'];
+    const monthOptions = [1, 3, 6, 12];
+    plans.forEach(p => {
+      monthOptions.forEach(m => {
+        referencesToCheck.add(`sub_${p}_${tenantId}_${m}`);
+      });
+    });
+
+    const client = getMpClient();
+    const payment = new Payment(client);
+    
+    let approvedPaymentFound = false;
+    let approvedPlan = 'STANDARD';
+    let approvedMonths = 1;
+
+    // Search in Mercado Pago
+    for (const ref of referencesToCheck) {
+      try {
+        const searchResponse = await payment.search({
+          options: {
+            external_reference: ref
+          }
+        });
+
+        const approvedPayment = searchResponse.results?.find(p => p.status === 'approved');
+        if (approvedPayment) {
+          approvedPaymentFound = true;
+          // Parse plan and months from reference
+          const parts = ref.split('_');
+          approvedPlan = parts[1];
+          approvedMonths = parseInt(parts[3], 10) || 1;
+          break; // Found an approved one, stop searching
+        }
+      } catch (err) {
+        console.error(`Error searching MP for reference ${ref}:`, err);
+      }
+    }
+
+    if (approvedPaymentFound) {
+      // Update tenant in database (same logic as webhook!)
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      
+      let baseDate = new Date();
+      if (tenant?.subActive && tenant.subExpiresAt && tenant.subExpiresAt > new Date()) {
+        baseDate = new Date(tenant.subExpiresAt);
+      }
+      
+      baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+
+      const updatedTenant = await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          subActive: true,
+          plan: approvedPlan,
+          subExpiresAt: baseDate
+        }
+      });
+
+      console.log(`Manual check: Tenant ${tenantId} subscription set to active (${approvedPlan} Plan, +${approvedMonths} months).`);
+
+      // Return updated user format so frontend can update its store
+      const salesCount = await prisma.sale.count({ where: { tenantId } });
+      
+      return res.json({
+        success: true,
+        message: '¡Pago verificado con éxito!',
+        subActive: true,
+        user: {
+          id: authReq.user?.id,
+          email: authReq.user?.email,
+          name: authReq.user?.name,
+          role: authReq.user?.role,
+          tenantId: tenantId,
+          plan: updatedTenant.plan,
+          subActive: true,
+          subExpiresAt: updatedTenant.subExpiresAt,
+          salesCount: salesCount
+        }
+      });
+    }
+
+    return res.json({
+      success: false,
+      subActive: false,
+      message: 'El pago aún no ha sido reportado o aprobado en Mercado Pago.'
+    });
+
+  } catch (error: any) {
+    console.error('Error in checkMpSubscriptionStatus:', error);
+    res.status(500).json({ message: 'Error al comprobar el pago en Mercado Pago', error: error.message });
   }
 };
 

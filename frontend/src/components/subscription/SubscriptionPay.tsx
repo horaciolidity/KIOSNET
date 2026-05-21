@@ -37,19 +37,21 @@ const SubscriptionPay: React.FC = () => {
     fetchPrices();
   }, [location.search]);
 
-  // 1. Poll the `/api/auth/me` endpoint to auto-unlock when payment is approved
+  // 1. Poll the active check endpoint to auto-unlock when payment is approved on Mercado Pago
   useEffect(() => {
     let intervalId: any;
 
     if (paymentOpened && user && !user.subActive) {
       intervalId = setInterval(async () => {
         try {
-          const response = await api.get('/auth/me');
-          const freshUser = response.data.user;
+          const response = await api.post('/payments/mercadopago/check-subscription', {
+            plan: selectedPlan,
+            months: selectedMonths
+          });
           
-          if (freshUser.subActive) {
+          if (response.data.success && response.data.subActive && response.data.user) {
             setSubscriptionActive(true);
-            setAuth(freshUser, token || '');
+            setAuth(response.data.user, token || '');
             clearInterval(intervalId);
           }
         } catch (err) {
@@ -61,7 +63,7 @@ const SubscriptionPay: React.FC = () => {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [paymentOpened, user, token, setAuth, setSubscriptionActive]);
+  }, [paymentOpened, user, token, selectedPlan, selectedMonths, setAuth, setSubscriptionActive]);
 
   const handlePaySubscription = async () => {
     setLoading(true);
@@ -109,17 +111,19 @@ const SubscriptionPay: React.FC = () => {
     setChecking(true);
     setError('');
     try {
-      const response = await api.get('/auth/me');
-      const freshUser = response.data.user;
+      const response = await api.post('/payments/mercadopago/check-subscription', {
+        plan: selectedPlan,
+        months: selectedMonths
+      });
       
-      if (freshUser.subActive) {
+      if (response.data.success && response.data.subActive && response.data.user) {
         setSubscriptionActive(true);
-        setAuth(freshUser, token || '');
+        setAuth(response.data.user, token || '');
       } else {
-        setError('El pago aún no ha sido reportado por Mercado Pago. Si acabas de abonar, aguarda 10 segundos y vuelve a presionar verificar.');
+        setError(response.data.message || 'El pago aún no ha sido reportado por Mercado Pago. Si acabas de abonar, aguarda 10 segundos y vuelve a presionar verificar.');
       }
-    } catch (err) {
-      setError('Error al conectar con el servidor.');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al conectar con el servidor.');
     } finally {
       setChecking(false);
     }

@@ -23,6 +23,7 @@ import {
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import api from '../../utils/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -50,6 +51,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Call the active check endpoint if a redirection from Mercado Pago is detected
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('sub') === 'success') {
+      const checkSub = async () => {
+        try {
+          // Send request to actively verify sub status on Mercado Pago
+          const response = await api.post('/payments/mercadopago/check-subscription', {});
+          if (response.data.success && response.data.subActive && response.data.user) {
+            setAuth(response.data.user, token || '');
+            // Clear URL search parameters without page reload
+            navigate(location.pathname, { replace: true });
+          }
+        } catch (err) {
+          console.error('Error verifying subscription redirection:', err);
+        }
+      };
+      checkSub();
+    }
+  }, [location.search, navigate, location.pathname, token, setAuth]);
 
   const isEmployee = user?.role === 'EMPLOYEE';
 
