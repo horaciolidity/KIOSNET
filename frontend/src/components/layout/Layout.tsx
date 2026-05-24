@@ -73,7 +73,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       const checkSub = async () => {
         try {
           // Send request to actively verify sub status on Mercado Pago
-          const response = await api.post('/payments/mercadopago/check-subscription', {});
+          const response = await api.post('/payments/mercadopago/check-subscription', {
+            plan: params.get('plan') || 'PRO',
+            months: params.get('months') || '1'
+          });
           if (response.data.success && response.data.subActive && response.data.user) {
             setAuth(response.data.user, token || '');
             // Clear URL search parameters without page reload

@@ -152,7 +152,7 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
         }
       ],
       back_urls: {
-        success: `${frontendUrl}/dashboard?sub=success`,
+        success: `${frontendUrl}/dashboard?sub=success&plan=${plan}&months=${numMonths}`,
         failure: `${frontendUrl}/dashboard?sub=failure`,
         pending: `${frontendUrl}/dashboard?sub=pending`
       },
@@ -230,7 +230,7 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
         }
       ],
       back_urls: {
-        success: `${frontendUrl}/dashboard?sub=success`,
+        success: `${frontendUrl}/dashboard?sub=success&plan=${plan}&months=${numMonths}`,
         failure: `${frontendUrl}/dashboard?sub=failure`,
         pending: `${frontendUrl}/dashboard?sub=pending`
       },

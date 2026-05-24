@@ -76,9 +76,8 @@ const SubscriptionPay: React.FC = () => {
       });
       const { initPoint } = response.data;
       
-      // Open the Mercado Pago Checkout link in a new tab
-      window.open(initPoint, '_blank');
-      setPaymentOpened(true);
+      // Redirect the current window to Mercado Pago to allow Deep Linking to the native app
+      window.location.href = initPoint;
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.message || 'Error al conectar con Mercado Pago. Inténtalo de nuevo.');
