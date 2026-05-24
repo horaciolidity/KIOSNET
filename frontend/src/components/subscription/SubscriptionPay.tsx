@@ -12,6 +12,7 @@ const SubscriptionPay: React.FC = () => {
   const [checking, setChecking] = useState(false);
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
@@ -57,7 +58,7 @@ const SubscriptionPay: React.FC = () => {
         } catch (err) {
           console.error('Error polling user subscription status:', err);
         }
-      }, 3000);
+      }, 15000); // Increased to 15 seconds to avoid MercadoPago API rate limits
     }
 
     return () => {
@@ -97,6 +98,7 @@ const SubscriptionPay: React.FC = () => {
       
       if (response.data.success && response.data.qrImage) {
         setQrImageUrl(response.data.qrImage);
+        setQrCodeUrl(response.data.qrCode);
         setPaymentOpened(true);
       }
     } catch (err: any) {
@@ -396,16 +398,73 @@ const SubscriptionPay: React.FC = () => {
               Abona de forma segura mediante Mercado Pago. La activación de tu cuenta será automática e inmediata.
             </p>
             </div>
+
+            {/* General Support Help Link */}
+            <div className="mt-6 pt-6 border-t border-white/5 flex flex-col items-center justify-center gap-2">
+              <p className="text-xs text-slate-400 font-medium">¿Tienes alguna duda o error con tu suscripción?</p>
+              <a
+                href="https://wa.me/5492617048835?text=Hola!%20Tengo%20una%20duda%20o%20inconveniente%20con%20el%20pago%20de%20suscripcion%20en%20KIOSNET"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-black transition-all uppercase tracking-wider"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-1.921c1.554.922 3.19 1.408 4.887 1.409 5.864 0 10.635-4.757 10.638-10.613.002-2.836-1.1-5.503-3.102-7.51-2.003-2.008-4.667-3.112-7.502-3.113-5.869 0-10.64 4.757-10.643 10.615-.001 1.83.488 3.619 1.417 5.176L1.83 22.097l5.062-1.849zm12.015-8.18c-.31-.156-1.839-.908-2.11-.1-.271.1-.387.417-.474.517-.087.1-.175.111-.486-.044-.31-.156-1.31-.483-2.495-1.54-.922-.822-1.543-1.838-1.724-2.15-.18-.31-.019-.478.136-.633.14-.139.31-.361.466-.543.156-.183.208-.313.31-.522.104-.21.052-.392-.026-.549-.078-.156-.685-1.651-.938-2.26-.247-.594-.499-.514-.685-.523-.175-.009-.377-.01-.58-.01a1.116 1.116 0 00-.809.378c-.277.311-1.057 1.033-1.057 2.52 0 1.487 1.082 2.922 1.232 3.122.15.2.2.13 1.134 3.013.9.78 1.637 1.543 2.5 1.868.863.325 1.653.24 2.273.15.688-.1 1.839-.751 2.1-.1.26.65.26 1.205.13 1.438-.13.233-.387.35-.698.506z"/>
+                </svg>
+                Soporte por WhatsApp
+              </a>
+            </div>
           </div>
         ) : (
           <div className="mt-8 max-w-md mx-auto bg-slate-900/90 border border-white/10 rounded-3xl p-8 text-center space-y-6 flex flex-col items-center shadow-2xl backdrop-blur-xl">
             {qrImageUrl ? (
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center w-full">
                 <h3 className="text-xl font-bold mb-2">Escanea para pagar</h3>
-                <p className="text-sm text-slate-400 mb-6">Abre la app de Mercado Pago y escanea este código QR</p>
+                
+                {/* Mobile direct payment redirection button */}
+                <div className="w-full md:hidden mb-6 space-y-4">
+                  <a
+                    href={qrCodeUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 px-6 rounded-2xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 text-sm uppercase tracking-wider"
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    Pagar desde este Celular
+                  </a>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                    <div className="relative flex justify-center"><span className="bg-slate-900/90 px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">o escanea el QR con Mercado Pago</span></div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-400 mb-6 hidden md:block">Abre la app de <strong>Mercado Pago</strong> y escanea este código QR</p>
+                <p className="text-xs text-slate-400 mb-6 md:hidden">Si estás usando otro dispositivo, escanea este código QR con Mercado Pago</p>
+                
                 <div className="bg-white p-4 rounded-2xl shadow-xl shadow-blue-500/10 mb-6">
                   <img src={qrImageUrl} alt="Mercado Pago QR Code" className="w-48 h-48 object-contain" />
                 </div>
+                
+                <div className="w-full space-y-4 mt-2">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                    <div className="relative flex justify-center"><span className="bg-slate-900/90 px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">¿OTRAS APPS O BANCOS?</span></div>
+                  </div>
+                  <div className="bg-slate-800/50 p-4 rounded-xl border border-white/5 text-left space-y-2">
+                    <p className="text-xs text-slate-300">Si deseas abonar con una app bancaria distinta a Mercado Pago, realiza una transferencia a:</p>
+                    <div className="bg-slate-950 p-3 rounded-lg border border-white/5 flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase">Alias</p>
+                        <p className="text-sm font-bold text-blue-400 font-mono">KIOSNET.PAGOS</p>
+                      </div>
+                      <button onClick={() => navigator.clipboard.writeText('KIOSNET.PAGOS')} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">Copiar</button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Transfiere el monto exacto de <strong>${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS</strong> y envía el comprobante por WhatsApp.
+                    </p>
+                  </div>
+                </div>
+
               </div>
             ) : (
               <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-2 relative">
@@ -421,7 +480,7 @@ const SubscriptionPay: React.FC = () => {
               </p>
             </div>
 
-            <div className="w-full space-y-3 pt-4">
+            <div className="w-full space-y-3 pt-4 border-t border-white/5">
               <button
                 onClick={handleCheckPaymentManually}
                 disabled={checking}
@@ -441,11 +500,27 @@ const SubscriptionPay: React.FC = () => {
                 onClick={() => {
                   setPaymentOpened(false);
                   setQrImageUrl(null);
+                  setQrCodeUrl(null);
                 }}
                 className="w-full bg-transparent hover:bg-white/5 text-slate-400 hover:text-white font-medium py-2 rounded-xl transition-all text-xs cursor-pointer"
               >
                 Cancelar o Cambiar método de pago
               </button>
+
+              <div className="border-t border-white/5 my-2 pt-2"></div>
+              
+              {/* WhatsApp instant support in case of error */}
+              <a
+                href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20con%20el%20pago%20de%20suscripcion%20en%20KIOSNET"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold py-3 rounded-xl border border-emerald-500/20 transition-all flex items-center justify-center gap-2 text-xs cursor-pointer uppercase tracking-wider"
+              >
+                <svg className="w-4 h-4 fill-emerald-400" viewBox="0 0 24 24">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-1.921c1.554.922 3.19 1.408 4.887 1.409 5.864 0 10.635-4.757 10.638-10.613.002-2.836-1.1-5.503-3.102-7.51-2.003-2.008-4.667-3.112-7.502-3.113-5.869 0-10.64 4.757-10.643 10.615-.001 1.83.488 3.619 1.417 5.176L1.83 22.097l5.062-1.849zm12.015-8.18c-.31-.156-1.839-.908-2.11-.1-.271.1-.387.417-.474.517-.087.1-.175.111-.486-.044-.31-.156-1.31-.483-2.495-1.54-.922-.822-1.543-1.838-1.724-2.15-.18-.31-.019-.478.136-.633.14-.139.31-.361.466-.543.156-.183.208-.313.31-.522.104-.21.052-.392-.026-.549-.078-.156-.685-1.651-.938-2.26-.247-.594-.499-.514-.685-.523-.175-.009-.377-.01-.58-.01a1.116 1.116 0 00-.809.378c-.277.311-1.057 1.033-1.057 2.52 0 1.487 1.082 2.922 1.232 3.122.15.2.2.13 1.134 3.013.9.78 1.637 1.543 2.5 1.868.863.325 1.653.24 2.273.15.688-.1 1.839-.751 2.1-.1.26.65.26 1.205.13 1.438-.13.233-.387.35-.698.506z"/>
+                </svg>
+                ¿Hubo un error? WhatsApp de Soporte
+              </a>
             </div>
           </div>
         )}

@@ -44,6 +44,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
+  // Close sidebar on mobile screens by default
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -115,12 +129,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="h-screen w-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex overflow-hidden">
+    <div className="h-screen w-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300 flex overflow-hidden relative">
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm md:hidden z-40 transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside 
         className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col z-50`}
+          isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'
+        } fixed md:static inset-y-0 left-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col z-50`}
       >
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0 flex items-center justify-center overflow-hidden p-0.5 shadow-sm">
@@ -209,6 +231,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   Activar Suscripción
                 </button>
               )}
+              <a
+                href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20o%20duda%20con%20el%20sistema%20KIOSNET"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full mt-2 flex items-center justify-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black py-2.5 rounded-xl border border-emerald-500/20 transition-all uppercase tracking-wider"
+              >
+                Soporte WhatsApp
+              </a>
             </div>
           )}
 

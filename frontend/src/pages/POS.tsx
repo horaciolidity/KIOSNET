@@ -54,6 +54,8 @@ const POS: React.FC = () => {
   const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
   const hasMP = isPro && businessInfo.mercadoPago?.isActive;
 
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TRANSFERENCIA' | 'DEBITO' | 'CREDITO' | 'CUENTA_CORRIENTE' | 'MERCADOPAGO'>('EFECTIVO');
@@ -334,7 +336,7 @@ const POS: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex overflow-hidden bg-slate-50 dark:bg-slate-950 print:bg-white">
+    <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden bg-slate-50 dark:bg-slate-950 print:bg-white relative">
       {/* Print-only Ticket Wrapper */}
       <div className="hidden print:block print:absolute print:inset-0 print:z-[200] bg-white p-4 w-[80mm] mx-auto text-black font-mono text-[10pt]">
         <div className="text-center border-b border-black pb-4 mb-4">
@@ -461,7 +463,7 @@ const POS: React.FC = () => {
       </div>
 
       {/* Cart Side */}
-      <div className="w-[420px] bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-10 print:hidden">
+      <div className="hidden md:flex w-[420px] bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-10 print:hidden">
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
           <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <ShoppingCart size={24} className="text-blue-600" /> Venta Actual
@@ -522,6 +524,91 @@ const POS: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Mobile Floating Cart Button */}
+      {cart.length > 0 && (
+        <div className="md:hidden fixed bottom-4 left-4 right-4 z-40 animate-in fade-in slide-in-from-bottom-5">
+          <button 
+            onClick={() => setIsMobileCartOpen(true)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-between px-6 py-4 rounded-2xl font-black text-base shadow-xl shadow-blue-600/30 cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-100 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-200"></span>
+              </span>
+              <span className="uppercase tracking-wider">Ver Carrito ({cart.length})</span>
+            </div>
+            <span className="text-xl tracking-tight">${total.toLocaleString()}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Cart Drawer */}
+      {isMobileCartOpen && (
+        <div className="fixed inset-0 z-50 md:hidden bg-slate-950/60 backdrop-blur-sm flex justify-end transition-opacity duration-300">
+          <div className="w-full max-w-[420px] bg-white dark:bg-slate-900 h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+              <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <ShoppingCart size={24} className="text-blue-600" /> Venta Actual
+              </h2>
+              <button 
+                onClick={() => setIsMobileCartOpen(false)}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 cursor-pointer"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {cart.map(item => (
+                <div key={item.id} className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                    {CATEGORY_EMOJIS[item.category]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-900 dark:text-white truncate text-sm">{item.name}</p>
+                    <p className="text-blue-600 font-black text-sm">${(item.price * item.quantity).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-blue-600"><Minus size={16} /></button>
+                    <span className="w-6 text-center font-black text-sm">{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-blue-600"><Plus size={16} /></button>
+                  </div>
+                  <button onClick={() => removeFromCart(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 space-y-4 pb-24">
+              <div className="flex justify-between items-center text-slate-900 dark:text-white">
+                <span className="text-lg font-black">TOTAL</span>
+                <span className="text-3xl font-black text-blue-600 tracking-tighter">${total.toLocaleString()}</span>
+              </div>
+
+              {!user?.subActive && (user?.salesCount ?? 0) >= 50 ? (
+                <button 
+                  onClick={() => window.location.href = '/billing'}
+                  className="w-full bg-gradient-to-r from-red-600 to-amber-600 text-white py-5 rounded-[24px] font-black text-lg hover:from-red-500 hover:to-amber-500 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  VENTAS BLOQUEADAS (ACTIVA PLAN)
+                </button>
+              ) : (
+                <button 
+                  disabled={cart.length === 0}
+                  onClick={() => {
+                    setIsMobileCartOpen(false);
+                    setIsCheckoutOpen(true);
+                  }}
+                  className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  PAGAR AHORA
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Checkout Modal */}
       {isCheckoutOpen && (
@@ -634,6 +721,18 @@ const POS: React.FC = () => {
                 >
                   Cancelar Pago
                 </button>
+                <div className="border-t border-white/5 my-2 pt-4 w-full max-w-xs"></div>
+                <a
+                  href={`https://wa.me/5492617048835?text=${encodeURIComponent(`Hola! Tengo un inconveniente con el cobro de una venta de $${total.toLocaleString()} (Venta ID: ${saleId}) en KIOSNET.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-bold transition-all uppercase tracking-wider w-full max-w-xs cursor-pointer"
+                >
+                  <svg className="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-1.921c1.554.922 3.19 1.408 4.887 1.409 5.864 0 10.635-4.757 10.638-10.613.002-2.836-1.1-5.503-3.102-7.51-2.003-2.008-4.667-3.112-7.502-3.113-5.869 0-10.64 4.757-10.643 10.615-.001 1.83.488 3.619 1.417 5.176L1.83 22.097l5.062-1.849zm12.015-8.18c-.31-.156-1.839-.908-2.11-.1-.271.1-.387.417-.474.517-.087.1-.175.111-.486-.044-.31-.156-1.31-.483-2.495-1.54-.922-.822-1.543-1.838-1.724-2.15-.18-.31-.019-.478.136-.633.14-.139.31-.361.466-.543.156-.183.208-.313.31-.522.104-.21.052-.392-.026-.549-.078-.156-.685-1.651-.938-2.26-.247-.594-.499-.514-.685-.523-.175-.009-.377-.01-.58-.01a1.116 1.116 0 00-.809.378c-.277.311-1.057 1.033-1.057 2.52 0 1.487 1.082 2.922 1.232 3.122.15.2.2.13 1.134 3.013.9.78 1.637 1.543 2.5 1.868.863.325 1.653.24 2.273.15.688-.1 1.839-.751 2.1-.1.26.65.26 1.205.13 1.438-.13.233-.387.35-.698.506z"/>
+                  </svg>
+                  Reportar error por WhatsApp
+                </a>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-8 animate-in zoom-in-95 duration-300 overflow-y-auto">

@@ -396,16 +396,9 @@ export const checkMpSubscriptionStatus = async (req: any, res: Response) => {
     const referencesToCheck = new Set<string>();
     if (plan && months) {
       referencesToCheck.add(`sub_${plan}_${tenantId}_${months}`);
+    } else {
+      return res.status(400).json({ message: 'Se requiere plan y meses para verificar el pago.' });
     }
-    
-    // Also add fallback combinations in case they clicked another plan/duration
-    const plans = ['PRO', 'STANDARD'];
-    const monthOptions = [1, 3, 6, 12];
-    plans.forEach(p => {
-      monthOptions.forEach(m => {
-        referencesToCheck.add(`sub_${p}_${tenantId}_${m}`);
-      });
-    });
 
     const client = getMpClient();
     const payment = new Payment(client);
