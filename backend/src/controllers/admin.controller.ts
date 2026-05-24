@@ -45,8 +45,9 @@ export const getAdminDashboard = async (req: any, res: Response) => {
     let pricePro = 15730;
 
     configPrices.forEach(cfg => {
-      if (cfg.key === 'price_standard') priceStandard = Number(cfg.value) || 12320;
-      if (cfg.key === 'price_pro') pricePro = Number(cfg.value) || 15730;
+      const val = Number(cfg.value);
+      if (cfg.key === 'price_standard' && !isNaN(val)) priceStandard = val;
+      if (cfg.key === 'price_pro' && !isNaN(val)) pricePro = val;
     });
 
     res.json({

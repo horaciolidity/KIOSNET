@@ -52,7 +52,7 @@ const POS: React.FC = () => {
   const activePlan = user?.subActive ? user?.plan : 'FREE';
   const isPro = activePlan === 'PRO';
   const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
-  const hasMP = isPro && businessInfo.mercadoPago?.isActive;
+  const hasMP = isPro && businessInfo?.mercadoPago?.isActive;
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -340,11 +340,11 @@ const POS: React.FC = () => {
       {/* Print-only Ticket Wrapper */}
       <div className="hidden print:block print:absolute print:inset-0 print:z-[200] bg-white p-4 w-[80mm] mx-auto text-black font-mono text-[10pt]">
         <div className="text-center border-b border-black pb-4 mb-4">
-          <p className="font-bold text-lg uppercase">{businessInfo.name}</p>
-          <p className="text-sm">{businessInfo.address}</p>
-          <p className="text-sm">CUIT: {businessInfo.taxId}</p>
-          <p className="text-sm">Tel: {businessInfo.phone}</p>
-          <p className="text-sm">{businessInfo.email}</p>
+          <p className="font-bold text-lg uppercase">{businessInfo?.name || 'Comercio'}</p>
+          <p className="text-sm">{businessInfo?.address}</p>
+          <p className="text-sm">CUIT: {businessInfo?.taxId}</p>
+          <p className="text-sm">Tel: {businessInfo?.phone}</p>
+          <p className="text-sm">{businessInfo?.email}</p>
           {selectedCustomerId && (
             <p className="text-sm mt-1 font-bold">Cliente: {customers.find(c => c.id === selectedCustomerId)?.name}</p>
           )}
@@ -740,11 +740,11 @@ const POS: React.FC = () => {
                 <div><h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">¡Venta Exitosa!</h2><p className="text-slate-500 font-medium">La transacción se ha registrado correctamente.</p></div>
                 <div className="w-full max-w-[320px] bg-slate-50 dark:bg-slate-800 p-6 rounded-[32px] border border-dashed border-slate-300 dark:border-slate-700 font-mono text-left text-xs text-slate-600 dark:text-slate-400 space-y-4">
                   <div className="text-center border-b border-dashed border-slate-300 dark:border-slate-700 pb-4">
-                    <p className="font-black text-slate-900 dark:text-white text-base uppercase">{businessInfo.name}</p>
-                    <p>{businessInfo.address}</p>
-                    <p>CUIT: {businessInfo.taxId}</p>
-                    <p>Tel: {businessInfo.phone}</p>
-                    <p>{businessInfo.email}</p>
+                    <p className="font-black text-slate-900 dark:text-white text-base uppercase">{businessInfo?.name || 'Comercio'}</p>
+                    <p>{businessInfo?.address}</p>
+                    <p>CUIT: {businessInfo?.taxId}</p>
+                    <p>Tel: {businessInfo?.phone}</p>
+                    <p>{businessInfo?.email}</p>
                     {selectedCustomerId && (
                       <p className="font-bold mt-1 text-slate-800 dark:text-slate-200">Cliente: {customers.find(c => c.id === selectedCustomerId)?.name}</p>
                     )}

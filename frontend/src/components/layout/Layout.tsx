@@ -152,7 +152,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex flex-col truncate">
               <span className="font-black text-[10px] uppercase tracking-widest text-blue-600 dark:text-blue-400">KIOSNET</span>
               <span className="font-bold text-sm tracking-tight text-slate-800 dark:text-white truncate mt-0.5">
-                {businessInfo.name}
+                {businessInfo?.name || 'Comercio'}
               </span>
             </div>
           )}

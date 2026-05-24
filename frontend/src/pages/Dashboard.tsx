@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white">Panel de Control</h1>
-          <p className="text-slate-500 font-medium">Bienvenido a {businessInfo.name}.</p>
+          <p className="text-slate-500 font-medium">Bienvenido a {businessInfo?.name || 'tu Comercio'}.</p>
         </div>
         <div className="flex gap-4">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
