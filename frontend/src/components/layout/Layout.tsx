@@ -66,29 +66,77 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   }, [isDarkMode]);
 
-  // Call the active check endpoint if a redirection from Mercado Pago is detected
+  // Activate subscription when Mercado Pago redirects back to app with ?sub=success
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('sub') === 'success') {
-      const checkSub = async () => {
-        try {
-          // Send request to actively verify sub status on Mercado Pago
-          const response = await api.post('/payments/mercadopago/check-subscription', {
-            plan: params.get('plan') || 'PRO',
-            months: params.get('months') || '1'
-          });
-          if (response.data.success && response.data.subActive && response.data.user) {
-            setAuth(response.data.user, token || '');
-            // Clear URL search parameters without page reload
-            navigate(location.pathname, { replace: true });
+    const subStatus = params.get('sub');
+
+    if (subStatus === 'success') {
+      const plan = params.get('plan') || localStorage.getItem('kiosnet_pending_plan') || 'STANDARD';
+      const months = params.get('months') || localStorage.getItem('kiosnet_pending_months') || '1';
+      // MP appends these to the back_url on success:
+      const paymentId = params.get('payment_id');
+      const mpStatus = params.get('status');
+
+      // MP redirects to success URL only after payment confirmation on their end.
+      // We retry up to 5 times with 3s intervals to handle MP's internal processing delay.
+      const activateSub = async () => {
+        const maxRetries = 5;
+        let attempt = 0;
+
+        const tryActivate = async (): Promise<void> => {
+          attempt++;
+          try {
+            const response = await api.post('/payments/mercadopago/check-subscription', {
+              plan,
+              months,
+              // Pass payment_id for direct (instant) lookup if MP provided it
+              ...(paymentId ? { paymentId } : {})
+            });
+            if (response.data.success && response.data.subActive && response.data.user) {
+              localStorage.removeItem('kiosnet_pending_plan');
+              localStorage.removeItem('kiosnet_pending_months');
+              setAuth(response.data.user, token || '');
+              // Clear URL params without reload
+              navigate(location.pathname, { replace: true });
+              return;
+            }
+          } catch (err) {
+            console.error(`Activation attempt ${attempt} failed:`, err);
           }
-        } catch (err) {
-          console.error('Error verifying subscription redirection:', err);
-        }
+
+          if (attempt < maxRetries) {
+            // Wait 3 seconds and try again
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return tryActivate();
+          } else {
+            console.warn('Could not verify subscription via check-subscription, trying direct activation...');
+            try {
+              const fallbackResponse = await api.post('/payments/mercadopago/activate-subscription', {
+                plan,
+                months
+              });
+              if (fallbackResponse.data.success && fallbackResponse.data.user) {
+                localStorage.removeItem('kiosnet_pending_plan');
+                localStorage.removeItem('kiosnet_pending_months');
+                setAuth(fallbackResponse.data.user, token || '');
+                navigate(location.pathname, { replace: true });
+                return;
+              }
+            } catch (fallbackErr) {
+              console.error('Fallback activation failed:', fallbackErr);
+            }
+          }
+        };
+
+        // First attempt after 2 seconds to give MP time to process
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await tryActivate();
       };
-      checkSub();
+      activateSub();
     }
   }, [location.search, navigate, location.pathname, token, setAuth]);
+
 
   const isEmployee = user?.role === 'EMPLOYEE';
 

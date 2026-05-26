@@ -27,6 +27,16 @@ const SubscriptionPay: React.FC = () => {
       setSelectedPlan(planParam);
     }
 
+    // Restore selected plan/months if returning from a MP redirect that failed to auto-activate
+    const savedPlan = localStorage.getItem('kiosnet_pending_plan');
+    const savedMonths = localStorage.getItem('kiosnet_pending_months');
+    if (savedPlan && (savedPlan === 'STANDARD' || savedPlan === 'PRO')) {
+      setSelectedPlan(savedPlan as 'STANDARD' | 'PRO');
+    }
+    if (savedMonths) {
+      setSelectedMonths(parseInt(savedMonths, 10) || 1);
+    }
+
     const fetchPrices = async () => {
       try {
         const response = await api.get('/payments/prices');
@@ -38,33 +48,40 @@ const SubscriptionPay: React.FC = () => {
     fetchPrices();
   }, [location.search]);
 
-  // 1. Poll the active check endpoint to auto-unlock when payment is approved on Mercado Pago
+
+  // Poll every 10s when QR has been shown — check if MP confirmed the payment
   useEffect(() => {
     let intervalId: any;
 
-    if (paymentOpened && user && !user.subActive) {
+    if (paymentOpened && qrImageUrl && user && !user.subActive) {
       intervalId = setInterval(async () => {
         try {
-          const response = await api.post('/payments/mercadopago/check-subscription', {
+          // check-subscription verifies with MP AND activates in DB if approved
+          const verifyResponse = await api.post('/payments/mercadopago/check-subscription', {
             plan: selectedPlan,
             months: selectedMonths
           });
-          
-          if (response.data.success && response.data.subActive && response.data.user) {
+
+          if (verifyResponse.data.success && verifyResponse.data.subActive && verifyResponse.data.user) {
+            localStorage.removeItem('kiosnet_pending_plan');
+            localStorage.removeItem('kiosnet_pending_months');
             setSubscriptionActive(true);
-            setAuth(response.data.user, token || '');
+            setAuth(verifyResponse.data.user, token || '');
             clearInterval(intervalId);
           }
         } catch (err) {
-          console.error('Error polling user subscription status:', err);
+          console.error('Error polling QR subscription status:', err);
         }
-      }, 15000); // Increased to 15 seconds to avoid MercadoPago API rate limits
+      }, 10000); // Poll every 10 seconds
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [paymentOpened, user, token, selectedPlan, selectedMonths, setAuth, setSubscriptionActive]);
+  }, [paymentOpened, qrImageUrl, user, token, selectedPlan, selectedMonths, setAuth, setSubscriptionActive]);
+
+
+
 
   const handlePaySubscription = async () => {
     setLoading(true);
@@ -76,7 +93,11 @@ const SubscriptionPay: React.FC = () => {
       });
       const { initPoint } = response.data;
       
-      // Redirect the current window to Mercado Pago to allow Deep Linking to the native app
+      // Save plan/months to localStorage BEFORE redirect so we can use them when MP returns
+      localStorage.setItem('kiosnet_pending_plan', selectedPlan);
+      localStorage.setItem('kiosnet_pending_months', String(selectedMonths));
+
+      // Redirect current tab to MP (enables native app deep-link on mobile)
       window.location.href = initPoint;
     } catch (err: any) {
       console.error(err);
@@ -85,6 +106,7 @@ const SubscriptionPay: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   const handlePayQR = async () => {
     setQrLoading(true);
@@ -112,16 +134,20 @@ const SubscriptionPay: React.FC = () => {
     setChecking(true);
     setError('');
     try {
-      const response = await api.post('/payments/mercadopago/check-subscription', {
+      // Step 1: Verify with MP that payment was actually made
+      const verifyResponse = await api.post('/payments/mercadopago/check-subscription', {
         plan: selectedPlan,
         months: selectedMonths
       });
-      
-      if (response.data.success && response.data.subActive && response.data.user) {
+
+      if (verifyResponse.data.success && verifyResponse.data.subActive && verifyResponse.data.user) {
+        // Payment confirmed by MP, use the user returned by check-subscription
+        localStorage.removeItem('kiosnet_pending_plan');
+        localStorage.removeItem('kiosnet_pending_months');
         setSubscriptionActive(true);
-        setAuth(response.data.user, token || '');
+        setAuth(verifyResponse.data.user, token || '');
       } else {
-        setError(response.data.message || 'El pago aún no ha sido reportado por Mercado Pago. Si acabas de abonar, aguarda 10 segundos y vuelve a presionar verificar.');
+        setError('El pago aún no fue reportado por Mercado Pago. Si pagaste con QR, esperá 30 segundos más y volvé a intentar. Si usaste el botón y completaste el pago, recargá la página e intentá de nuevo.');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Error al conectar con el servidor.');
@@ -129,6 +155,8 @@ const SubscriptionPay: React.FC = () => {
       setChecking(false);
     }
   };
+
+
 
   const salesCount = user?.salesCount ?? 0;
   const salesPercentage = Math.min((salesCount / 50) * 100, 100);

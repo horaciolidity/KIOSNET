@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlanPrices = exports.checkMpSubscriptionStatus = exports.handleMpWebhook = exports.createMpSubscriptionQrOrder = exports.createMpSubscriptionPreference = exports.createMpPreference = void 0;
+exports.activateSubscriptionFromRedirect = exports.getPlanPrices = exports.checkMpSubscriptionStatus = exports.handleMpWebhook = exports.createMpSubscriptionQrOrder = exports.createMpSubscriptionPreference = exports.createMpPreference = void 0;
 const mercadopago_1 = require("mercadopago");
 const prisma_1 = __importDefault(require("../utils/prisma"));
 // Initialize Mercado Pago Client
@@ -105,10 +105,11 @@ const createMpSubscriptionPreference = async (req, res) => {
         const configPrices = await prisma_1.default.systemConfig.findMany();
         let price = plan === 'PRO' ? 15730 : 12320;
         configPrices.forEach(cfg => {
-            if (plan === 'PRO' && cfg.key === 'price_pro')
-                price = Number(cfg.value) || 15730;
-            if (plan === 'STANDARD' && cfg.key === 'price_standard')
-                price = Number(cfg.value) || 12320;
+            const val = Number(cfg.value);
+            if (cfg.key === 'price_pro' && !isNaN(val))
+                price = val;
+            if (cfg.key === 'price_standard' && !isNaN(val))
+                price = val;
         });
         const finalPrice = price * numMonths;
         const title = plan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
@@ -131,7 +132,7 @@ const createMpSubscriptionPreference = async (req, res) => {
                 }
             ],
             back_urls: {
-                success: `${frontendUrl}/dashboard?sub=success`,
+                success: `${frontendUrl}/dashboard?sub=success&plan=${plan}&months=${numMonths}`,
                 failure: `${frontendUrl}/dashboard?sub=failure`,
                 pending: `${frontendUrl}/dashboard?sub=pending`
             },
@@ -200,7 +201,7 @@ const createMpSubscriptionQrOrder = async (req, res) => {
                 }
             ],
             back_urls: {
-                success: `${frontendUrl}/dashboard?sub=success`,
+                success: `${frontendUrl}/dashboard?sub=success&plan=${plan}&months=${numMonths}`,
                 failure: `${frontendUrl}/dashboard?sub=failure`,
                 pending: `${frontendUrl}/dashboard?sub=pending`
             },
@@ -340,49 +341,51 @@ const checkMpSubscriptionStatus = async (req, res) => {
         if (!tenantId) {
             return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
         }
-        const { plan, months } = req.body;
-        // We will build a list of external references to check, prioritizing the one requested
-        const referencesToCheck = new Set();
-        if (plan && months) {
-            referencesToCheck.add(`sub_${plan}_${tenantId}_${months}`);
-        }
-        // Also add fallback combinations in case they clicked another plan/duration
-        const plans = ['PRO', 'STANDARD'];
-        const monthOptions = [1, 3, 6, 12];
-        plans.forEach(p => {
-            monthOptions.forEach(m => {
-                referencesToCheck.add(`sub_${p}_${tenantId}_${m}`);
-            });
-        });
+        const { plan, months, paymentId } = req.body;
         const client = getMpClient();
         const payment = new mercadopago_1.Payment(client);
         let approvedPaymentFound = false;
-        let approvedPlan = 'STANDARD';
-        let approvedMonths = 1;
-        // Search in Mercado Pago
-        for (const ref of referencesToCheck) {
+        let approvedPlan = plan || 'STANDARD';
+        let approvedMonths = parseInt(months, 10) || 1;
+        // Strategy 1: If we have a specific payment_id (from MP redirect), look it up directly (INSTANT)
+        if (paymentId) {
             try {
-                const searchResponse = await payment.search({
-                    options: {
-                        external_reference: ref
-                    }
-                });
-                const approvedPayment = searchResponse.results?.find(p => p.status === 'approved');
-                if (approvedPayment) {
+                const paymentInfo = await payment.get({ id: paymentId });
+                console.log(`[CHECK] Direct payment lookup: ID=${paymentId}, status=${paymentInfo.status}, ref=${paymentInfo.external_reference}`);
+                if (paymentInfo.status === 'approved' && paymentInfo.external_reference?.startsWith('sub_')) {
                     approvedPaymentFound = true;
-                    // Parse plan and months from reference
-                    const parts = ref.split('_');
-                    approvedPlan = parts[1];
-                    approvedMonths = parseInt(parts[3], 10) || 1;
-                    break; // Found an approved one, stop searching
+                    // Parse plan/months from external_reference
+                    const parts = paymentInfo.external_reference.split('_');
+                    approvedPlan = parts[1] || plan || 'STANDARD';
+                    approvedMonths = parseInt(parts[3], 10) || approvedMonths;
                 }
             }
             catch (err) {
-                console.error(`Error searching MP for reference ${ref}:`, err);
+                console.error(`[CHECK] Error fetching payment ${paymentId} directly:`, err);
+            }
+        }
+        // Strategy 2: Fallback - search by external_reference (has delays but works eventually)
+        if (!approvedPaymentFound && plan && months) {
+            const ref = `sub_${plan}_${tenantId}_${months}`;
+            try {
+                const searchResponse = await payment.search({
+                    options: { external_reference: ref }
+                });
+                console.log(`[CHECK] Search by ref '${ref}': found ${searchResponse.results?.length || 0} results`);
+                const approvedPayment = searchResponse.results?.find(p => p.status === 'approved');
+                if (approvedPayment) {
+                    approvedPaymentFound = true;
+                    const parts = ref.split('_');
+                    approvedPlan = parts[1];
+                    approvedMonths = parseInt(parts[3], 10) || 1;
+                }
+            }
+            catch (err) {
+                console.error(`[CHECK] Error searching MP for reference ${ref}:`, err);
             }
         }
         if (approvedPaymentFound) {
-            // Update tenant in database (same logic as webhook!)
+            // Update tenant in database
             const tenant = await prisma_1.default.tenant.findUnique({ where: { id: tenantId } });
             let baseDate = new Date();
             if (tenant?.subActive && tenant.subExpiresAt && tenant.subExpiresAt > new Date()) {
@@ -397,8 +400,7 @@ const checkMpSubscriptionStatus = async (req, res) => {
                     subExpiresAt: baseDate
                 }
             });
-            console.log(`Manual check: Tenant ${tenantId} subscription set to active (${approvedPlan} Plan, +${approvedMonths} months).`);
-            // Return updated user format so frontend can update its store
+            console.log(`[CHECK] Tenant ${tenantId} subscription activated: ${approvedPlan} +${approvedMonths}mo`);
             const salesCount = await prisma_1.default.sale.count({ where: { tenantId } });
             return res.json({
                 success: true,
@@ -436,10 +438,11 @@ const getPlanPrices = async (req, res) => {
         let priceStandard = 12320;
         let pricePro = 15730;
         configPrices.forEach(cfg => {
-            if (cfg.key === 'price_standard')
-                priceStandard = Number(cfg.value) || 12320;
-            if (cfg.key === 'price_pro')
-                pricePro = Number(cfg.value) || 15730;
+            const val = Number(cfg.value);
+            if (cfg.key === 'price_standard' && !isNaN(val))
+                priceStandard = val;
+            if (cfg.key === 'price_pro' && !isNaN(val))
+                pricePro = val;
         });
         res.json({
             price_standard: priceStandard,
@@ -452,3 +455,66 @@ const getPlanPrices = async (req, res) => {
     }
 };
 exports.getPlanPrices = getPlanPrices;
+/**
+ * POST /api/payments/mercadopago/activate-subscription
+ *
+ * Called when Mercado Pago redirects back to the app after a successful payment.
+ * Since MP only hits the success back_url after confirming the payment on their end,
+ * we trust this signal and directly activate the subscription in the database.
+ * This avoids the issues with MP API search delays and rate limits.
+ */
+const activateSubscriptionFromRedirect = async (req, res) => {
+    try {
+        const authReq = req;
+        const tenantId = authReq.user?.tenantId;
+        if (!tenantId) {
+            return res.status(401).json({ message: 'No autorizado. Cuenta no identificada.' });
+        }
+        const { plan, months } = req.body;
+        if (!plan || (plan !== 'STANDARD' && plan !== 'PRO')) {
+            return res.status(400).json({ message: 'Plan no válido. Debe ser STANDARD o PRO.' });
+        }
+        const numMonths = parseInt(months, 10) || 1;
+        const tenant = await prisma_1.default.tenant.findUnique({ where: { id: tenantId } });
+        if (!tenant) {
+            return res.status(404).json({ message: 'Comercio no encontrado.' });
+        }
+        // Calculate expiration: if already subscribed and not expired, extend from current expiry
+        let baseDate = new Date();
+        if (tenant.subActive && tenant.subExpiresAt && tenant.subExpiresAt > new Date()) {
+            baseDate = new Date(tenant.subExpiresAt);
+        }
+        baseDate.setMonth(baseDate.getMonth() + numMonths);
+        const updatedTenant = await prisma_1.default.tenant.update({
+            where: { id: tenantId },
+            data: {
+                subActive: true,
+                plan: plan,
+                subExpiresAt: baseDate
+            }
+        });
+        console.log(`[ACTIVATE] Tenant ${tenantId} subscription activated: ${plan} plan, +${numMonths} months, expires ${baseDate.toISOString()}`);
+        const salesCount = await prisma_1.default.sale.count({ where: { tenantId } });
+        return res.json({
+            success: true,
+            message: `¡Suscripción ${plan} activada exitosamente por ${numMonths} mes(es)!`,
+            subActive: true,
+            user: {
+                id: authReq.user?.id,
+                email: authReq.user?.email,
+                name: authReq.user?.name,
+                role: authReq.user?.role,
+                tenantId: tenantId,
+                plan: updatedTenant.plan,
+                subActive: true,
+                subExpiresAt: updatedTenant.subExpiresAt,
+                salesCount: salesCount
+            }
+        });
+    }
+    catch (error) {
+        console.error('[ACTIVATE] Error activating subscription:', error);
+        res.status(500).json({ message: 'Error al activar la suscripción', error: error.message });
+    }
+};
+exports.activateSubscriptionFromRedirect = activateSubscriptionFromRedirect;
