@@ -97,6 +97,35 @@ const SuperAdmin: React.FC = () => {
     }
   };
 
+  const [togglingTenantId, setTogglingTenantId] = useState<string | null>(null);
+
+  const handleToggleTenantStatus = async (tenantId: string, currentStatus: boolean) => {
+    try {
+      setTogglingTenantId(tenantId);
+      const response = await api.post(`/admin/tenants/${tenantId}/toggle-status`, {
+        subActive: !currentStatus
+      });
+      setFeedbackMessage({
+        type: 'success',
+        text: response.data.message
+      });
+      setTimeout(() => setFeedbackMessage(null), 4000);
+      
+      // Update local state directly
+      setTenants(prev => prev.map(t => 
+        t.id === tenantId ? { ...t, subActive: !currentStatus } : t
+      ));
+    } catch (error: any) {
+      console.error('Error toggling tenant status:', error);
+      setFeedbackMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Error al cambiar el estado del comercio.'
+      });
+    } finally {
+      setTogglingTenantId(null);
+    }
+  };
+
   // Filter logic
   const filteredTenants = tenants.filter(t => {
     const query = searchTerm.toLowerCase();
@@ -306,6 +335,7 @@ const SuperAdmin: React.FC = () => {
                   <th className="p-4 text-xs font-black uppercase tracking-wider text-slate-400">Estado Licencia</th>
                   <th className="p-4 text-xs font-black uppercase tracking-wider text-slate-400 text-center">Ventas Realizadas</th>
                   <th className="p-4 text-xs font-black uppercase tracking-wider text-slate-400">Fecha Alta</th>
+                  <th className="p-4 text-xs font-black uppercase tracking-wider text-slate-400 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -367,6 +397,25 @@ const SuperAdmin: React.FC = () => {
                     </td>
                     <td className="p-4 text-xs font-bold text-slate-400">
                       {new Date(t.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleToggleTenantStatus(t.id, t.subActive)}
+                        disabled={togglingTenantId === t.id}
+                        className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 ${
+                          t.subActive
+                            ? 'bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20'
+                            : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20'
+                        }`}
+                      >
+                        {togglingTenantId === t.id ? (
+                          'Procesando...'
+                        ) : t.subActive ? (
+                          'Desactivar'
+                        ) : (
+                          'Activar'
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updatePlanPrices = exports.getAdminDashboard = void 0;
+exports.toggleTenantStatus = exports.updatePlanPrices = exports.getAdminDashboard = void 0;
 const prisma_1 = __importDefault(require("../utils/prisma"));
 // Helper to check super admin authorization
 const authorizeSuperAdmin = (req, res) => {
@@ -112,3 +112,35 @@ const updatePlanPrices = async (req, res) => {
     }
 };
 exports.updatePlanPrices = updatePlanPrices;
+// POST /api/admin/tenants/:id/toggle-status
+const toggleTenantStatus = async (req, res) => {
+    const authReq = req;
+    if (!authorizeSuperAdmin(authReq, res))
+        return;
+    try {
+        const { id } = req.params;
+        const { subActive } = req.body;
+        const tenant = await prisma_1.default.tenant.findUnique({ where: { id } });
+        if (!tenant) {
+            return res.status(404).json({ message: 'Comercio no encontrado.' });
+        }
+        const updatedTenant = await prisma_1.default.tenant.update({
+            where: { id },
+            data: {
+                subActive: subActive !== undefined ? subActive : !tenant.subActive
+            }
+        });
+        res.json({
+            message: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? 'activado' : 'desactivado'} exitosamente.`,
+            tenant: {
+                id: updatedTenant.id,
+                subActive: updatedTenant.subActive
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error toggling tenant status:', error);
+        res.status(500).json({ message: 'Error interno del servidor al cambiar el estado del comercio.' });
+    }
+};
+exports.toggleTenantStatus = toggleTenantStatus;

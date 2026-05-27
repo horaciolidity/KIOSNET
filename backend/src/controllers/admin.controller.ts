@@ -112,3 +112,37 @@ export const updatePlanPrices = async (req: any, res: Response) => {
     res.status(500).json({ message: 'Error interno del servidor al actualizar los precios.' });
   }
 };
+
+// POST /api/admin/tenants/:id/toggle-status
+export const toggleTenantStatus = async (req: any, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  if (!authorizeSuperAdmin(authReq, res)) return;
+
+  try {
+    const { id } = req.params;
+    const { subActive } = req.body;
+
+    const tenant = await prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) {
+      return res.status(404).json({ message: 'Comercio no encontrado.' });
+    }
+
+    const updatedTenant = await prisma.tenant.update({
+      where: { id },
+      data: {
+        subActive: subActive !== undefined ? subActive : !tenant.subActive
+      }
+    });
+
+    res.json({
+      message: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? 'activado' : 'desactivado'} exitosamente.`,
+      tenant: {
+        id: updatedTenant.id,
+        subActive: updatedTenant.subActive
+      }
+    });
+  } catch (error) {
+    console.error('Error toggling tenant status:', error);
+    res.status(500).json({ message: 'Error interno del servidor al cambiar el estado del comercio.' });
+  }
+};
