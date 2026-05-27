@@ -11,7 +11,10 @@ import {
   XCircle, 
   RefreshCw,
   Building,
-  Key
+  Key,
+  X,
+  Calendar,
+  Power
 } from 'lucide-react';
 import api from '../utils/api';
 
@@ -98,23 +101,43 @@ const SuperAdmin: React.FC = () => {
   };
 
   const [togglingTenantId, setTogglingTenantId] = useState<string | null>(null);
+  const [activateModal, setActivateModal] = useState<{ tenantId: string; tenantName: string } | null>(null);
+  const [activateDays, setActivateDays] = useState<string>('30');
+  const [activatePlan, setActivatePlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
 
-  const handleToggleTenantStatus = async (tenantId: string, currentStatus: boolean) => {
+  const openActivateModal = (tenantId: string, tenantName: string, currentPlan: string) => {
+    setActivateDays('30');
+    setActivatePlan((currentPlan === 'PRO' ? 'PRO' : 'STANDARD') as 'STANDARD' | 'PRO');
+    setActivateModal({ tenantId, tenantName });
+  };
+
+  const handleToggleTenantStatus = async (tenantId: string, subActive: boolean, days?: number, plan?: string) => {
     try {
       setTogglingTenantId(tenantId);
       const response = await api.post(`/admin/tenants/${tenantId}/toggle-status`, {
-        subActive: !currentStatus
+        subActive,
+        ...(days !== undefined ? { days } : {}),
+        ...(plan ? { plan } : {})
       });
       setFeedbackMessage({
         type: 'success',
         text: response.data.message
       });
-      setTimeout(() => setFeedbackMessage(null), 4000);
+      setTimeout(() => setFeedbackMessage(null), 5000);
       
-      // Update local state directly
+      // Update local state with returned tenant data
+      const updatedTenantData = response.data.tenant;
       setTenants(prev => prev.map(t => 
-        t.id === tenantId ? { ...t, subActive: !currentStatus } : t
+        t.id === tenantId 
+          ? { 
+              ...t, 
+              subActive: updatedTenantData.subActive,
+              subExpiresAt: updatedTenantData.subExpiresAt || t.subExpiresAt,
+              plan: updatedTenantData.plan || t.plan
+            } 
+          : t
       ));
+      setActivateModal(null);
     } catch (error: any) {
       console.error('Error toggling tenant status:', error);
       setFeedbackMessage({
@@ -399,23 +422,37 @@ const SuperAdmin: React.FC = () => {
                       {new Date(t.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={() => handleToggleTenantStatus(t.id, t.subActive)}
-                        disabled={togglingTenantId === t.id}
-                        className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 ${
-                          t.subActive
-                            ? 'bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20'
-                            : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20'
-                        }`}
-                      >
-                        {togglingTenantId === t.id ? (
-                          'Procesando...'
-                        ) : t.subActive ? (
-                          'Desactivar'
+                      <div className="flex items-center justify-end gap-2">
+                        {!t.subActive ? (
+                          <button
+                            onClick={() => openActivateModal(t.id, t.name, t.plan)}
+                            disabled={togglingTenantId === t.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20"
+                          >
+                            <Power size={11} />
+                            {togglingTenantId === t.id ? 'Procesando...' : 'Activar'}
+                          </button>
                         ) : (
-                          'Activar'
+                          <>
+                            <button
+                              onClick={() => openActivateModal(t.id, t.name, t.plan)}
+                              disabled={togglingTenantId === t.id}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/20"
+                            >
+                              <Calendar size={11} />
+                              Extender
+                            </button>
+                            <button
+                              onClick={() => handleToggleTenantStatus(t.id, false)}
+                              disabled={togglingTenantId === t.id}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20"
+                            >
+                              <XCircle size={11} />
+                              {togglingTenantId === t.id ? 'Procesando...' : 'Desactivar'}
+                            </button>
+                          </>
                         )}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -425,6 +462,125 @@ const SuperAdmin: React.FC = () => {
         )}
       </div>
     </div>
+
+    {/* Activation Modal */}
+    {activateModal && (
+      <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-300">
+          {/* Modal Header */}
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6 text-white flex justify-between items-start">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100 mb-1">Activar / Extender Suscripción</p>
+              <h3 className="text-xl font-black">{activateModal.tenantName}</h3>
+            </div>
+            <button onClick={() => setActivateModal(null)} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Plan selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Plan a asignar</label>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setActivatePlan('STANDARD')}
+                  className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${
+                    activatePlan === 'STANDARD'
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
+                  }`}
+                >
+                  <Zap size={14} className="inline mr-1.5" />
+                  Estándar
+                </button>
+                <button
+                  onClick={() => setActivatePlan('PRO')}
+                  className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${
+                    activatePlan === 'PRO'
+                      ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/20'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400'
+                  }`}
+                >
+                  <Crown size={14} className="inline mr-1.5" />
+                  Pro
+                </button>
+              </div>
+            </div>
+
+            {/* Days input */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} /> Días de suscripción
+              </label>
+              <div className="flex gap-2">
+                {['0', '7', '15', '30', '60', '90'].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setActivateDays(d)}
+                    className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${
+                      activateDays === d
+                        ? 'bg-emerald-600 border-emerald-500 text-white'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-400'
+                    }`}
+                  >
+                    {d === '0' ? 'Manual' : d + 'd'}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min="0"
+                value={activateDays}
+                onChange={(e) => setActivateDays(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-3 px-4 font-black text-slate-900 dark:text-white text-lg text-center focus:outline-none focus:border-emerald-500 transition-colors"
+                placeholder="Cantidad de días"
+              />
+              {activateDays === '0' ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-bold text-center">
+                  ⚠ Con 0 días, el comercio queda activo sin fecha de vencimiento.
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 font-bold text-center">
+                  Vencimiento: {(() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + parseInt(activateDays || '0'));
+                    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                  })()}
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setActivateModal(null)}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-3.5 rounded-2xl font-black text-sm transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleToggleTenantStatus(
+                  activateModal.tenantId,
+                  true,
+                  parseInt(activateDays || '0'),
+                  activatePlan
+                )}
+                disabled={togglingTenantId === activateModal.tenantId}
+                className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white py-3.5 rounded-2xl font-black text-sm transition-all shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {togglingTenantId === activateModal.tenantId ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Power size={16} />
+                )}
+                {togglingTenantId === activateModal.tenantId ? 'Activando...' : 'Activar Ahora'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   );
 };
 

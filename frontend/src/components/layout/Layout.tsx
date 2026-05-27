@@ -74,9 +74,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (subStatus === 'success') {
       const plan = params.get('plan') || localStorage.getItem('kiosnet_pending_plan') || 'STANDARD';
       const months = params.get('months') || localStorage.getItem('kiosnet_pending_months') || '1';
-      // MP appends these to the back_url on success:
+      // MP appends payment_id to the back_url on success:
       const paymentId = params.get('payment_id');
-      const mpStatus = params.get('status');
 
       // MP redirects to success URL only after payment confirmation on their end.
       // We retry up to 5 times with 3s intervals to handle MP's internal processing delay.

@@ -120,25 +120,50 @@ export const toggleTenantStatus = async (req: any, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { subActive } = req.body;
+    const { subActive, days, plan } = req.body;
 
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {
       return res.status(404).json({ message: 'Comercio no encontrado.' });
     }
 
+    const newStatus = subActive !== undefined ? subActive : !tenant.subActive;
+    
+    // Calculate new expiry if activating with a specific number of days
+    let newExpiresAt: Date | undefined;
+    if (newStatus && days !== undefined) {
+      const numDays = parseInt(String(days), 10);
+      if (numDays > 0) {
+        // If tenant already has an active sub, extend from current expiry; otherwise from now
+        const baseDate = (tenant.subActive && tenant.subExpiresAt && tenant.subExpiresAt > new Date())
+          ? new Date(tenant.subExpiresAt)
+          : new Date();
+        baseDate.setDate(baseDate.getDate() + numDays);
+        newExpiresAt = baseDate;
+      }
+      // if days === 0: activate without changing expiry (manual/indefinite)
+    }
+
+    const updateData: any = { subActive: newStatus };
+    if (plan) updateData.plan = plan;
+    if (newExpiresAt) updateData.subExpiresAt = newExpiresAt;
+
     const updatedTenant = await prisma.tenant.update({
       where: { id },
-      data: {
-        subActive: subActive !== undefined ? subActive : !tenant.subActive
-      }
+      data: updateData
     });
 
+    const daysMsg = newExpiresAt 
+      ? ` por ${days} días (hasta ${newExpiresAt.toLocaleDateString('es-AR')})` 
+      : '';
+
     res.json({
-      message: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? 'activado' : 'desactivado'} exitosamente.`,
+      message: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? `activado${daysMsg}` : 'desactivado'} exitosamente.`,
       tenant: {
         id: updatedTenant.id,
-        subActive: updatedTenant.subActive
+        subActive: updatedTenant.subActive,
+        subExpiresAt: updatedTenant.subExpiresAt,
+        plan: updatedTenant.plan
       }
     });
   } catch (error) {
