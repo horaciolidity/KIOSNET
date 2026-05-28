@@ -122,7 +122,8 @@ const toggleTenantStatus = async (req, res) => {
         const { subActive, days, plan } = req.body;
         const tenant = await prisma_1.default.tenant.findUnique({ where: { id } });
         if (!tenant) {
-            return res.status(404).json({ message: 'Comercio no encontrado.' });
+            console.warn(`toggleTenantStatus: comercio no encontrado. id=${id}`);
+            return res.status(404).json({ message: `Comercio no encontrado para el id ${id}.` });
         }
         const newStatus = subActive !== undefined ? subActive : !tenant.subActive;
         // Calculate new expiry if activating with a specific number of days

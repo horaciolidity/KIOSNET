@@ -114,7 +114,7 @@ const SuperAdmin: React.FC = () => {
   const handleToggleTenantStatus = async (tenantId: string, subActive: boolean, days?: number, plan?: string) => {
     try {
       setTogglingTenantId(tenantId);
-      const response = await api.post(`/admin/tenants/${tenantId}/toggle-status`, {
+      const response = await api.post(`/admin/tenants/${encodeURIComponent(tenantId)}/toggle-status`, {
         subActive,
         ...(days !== undefined ? { days } : {}),
         ...(plan ? { plan } : {})
@@ -125,7 +125,7 @@ const SuperAdmin: React.FC = () => {
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       
-      // Update local state with returned tenant data
+      // Update local state with returned tenant data and refresh the dashboard.
       const updatedTenantData = response.data.tenant;
       setTenants(prev => prev.map(t => 
         t.id === tenantId 
@@ -137,6 +137,7 @@ const SuperAdmin: React.FC = () => {
             } 
           : t
       ));
+      await fetchData();
       setActivateModal(null);
     } catch (error: any) {
       console.error('Error toggling tenant status:', error);

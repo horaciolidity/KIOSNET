@@ -124,7 +124,8 @@ export const toggleTenantStatus = async (req: any, res: Response) => {
 
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {
-      return res.status(404).json({ message: 'Comercio no encontrado.' });
+      console.warn(`toggleTenantStatus: comercio no encontrado. id=${id}`);
+      return res.status(404).json({ message: `Comercio no encontrado para el id ${id}.` });
     }
 
     const newStatus = subActive !== undefined ? subActive : !tenant.subActive;
