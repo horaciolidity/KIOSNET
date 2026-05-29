@@ -8,6 +8,11 @@ import prisma from '../utils/prisma';
 // Initialize Mercado Pago Client
 const getMpClient = () => {
   const token = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+
+  if (!process.env.MP_ACCESS_TOKEN) {
+    console.warn('Warning: MP_ACCESS_TOKEN is not configured. Using fallback Mercado Pago token. Set MP_ACCESS_TOKEN in production.');
+  }
+
   return new MercadoPagoConfig({
     accessToken: token,
     options: { timeout: 5000 }
@@ -87,9 +92,14 @@ export const createMpPreference = async (req: any, res: Response) => {
       body: preferenceBody
     });
 
+    const initPoint = response.init_point || response.sandbox_init_point;
+    if (!initPoint) {
+      throw new Error('Mercado Pago no devolvió init_point para la preferencia.');
+    }
+
     res.json({
       preferenceId: response.id,
-      initPoint: response.init_point,
+      initPoint,
       saleId: pendingSale.id
     });
   } catch (error: any) {
@@ -167,9 +177,14 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
       body: preferenceBody
     });
 
+    const initPoint = response.init_point || response.sandbox_init_point;
+    if (!initPoint) {
+      throw new Error('Mercado Pago no devolvió init_point para la preferencia de suscripción.');
+    }
+
     res.json({
       preferenceId: response.id,
-      initPoint: response.init_point
+      initPoint
     });
   } catch (error: any) {
     console.error('Error creating subscription preference:', error);
@@ -245,19 +260,25 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
       body: preferenceBody
     });
 
-    const initPoint = response.init_point;
-    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint || '')}`;
+    const initPoint = response.init_point || response.sandbox_init_point;
+    if (!initPoint) {
+      throw new Error('Mercado Pago no devolvió init_point para la preferencia de QR de suscripción.');
+    }
+
+    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint)}`;
 
     res.json({
       success: true,
-      qrImage: qrImage,
+      qrImage,
       qrCode: initPoint
     });
   } catch (error: any) {
     console.error('Error creating subscription QR order preference:', error);
+    const details = error.response?.data || error.cause || null;
     res.status(500).json({ 
       message: 'Error al iniciar pago QR con Mercado Pago', 
-      error: error.message
+      error: error.message,
+      details
     });
   }
 };
