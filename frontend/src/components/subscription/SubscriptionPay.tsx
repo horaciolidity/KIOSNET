@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Check, CreditCard, LogOut, Loader2, Sparkles, RefreshCw, Zap, ArrowLeft, QrCode } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import api from '../../utils/api';
+import { supabase } from '../../utils/supabaseClient';
+import axios from 'axios';
+
+const MP_DEFAULT_TOKEN = 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
 
 const SubscriptionPay: React.FC = () => {
   const { user, token, setAuth, logout, setSubscriptionActive } = useAuthStore();
@@ -18,6 +21,107 @@ const SubscriptionPay: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
+
+  // Helper to verify and activate payment directly from client side
+  const checkAndActivatePayment = async (plan: 'STANDARD' | 'PRO', months: number, paymentId?: string | null) => {
+    const tenantId = user?.tenantId;
+    if (!tenantId) return { success: false };
+
+    let approvedPaymentFound = false;
+    let approvedPlan = plan;
+    let approvedMonths = months;
+
+    // Strategy 1: Direct payment lookup if we have paymentId
+    if (paymentId) {
+      try {
+        const pResponse = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+          headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
+        });
+        const paymentInfo = pResponse.data;
+        if (paymentInfo.status === 'approved' && paymentInfo.external_reference?.startsWith('sub_')) {
+          approvedPaymentFound = true;
+          const parts = paymentInfo.external_reference.split('_');
+          approvedPlan = parts[1] || plan;
+          approvedMonths = parseInt(parts[3], 10) || months;
+        }
+      } catch (err) {
+        console.error('Error looking up payment directly:', err);
+      }
+    }
+
+    // Strategy 2: Search by external_reference
+    if (!approvedPaymentFound) {
+      const ref = `sub_${plan}_${tenantId}_${months}`;
+      try {
+        const searchResponse = await axios.get(`https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`, {
+          headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
+        });
+        const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');
+        if (approvedPayment) {
+          approvedPaymentFound = true;
+          const parts = ref.split('_');
+          approvedPlan = parts[1] as any;
+          approvedMonths = parseInt(parts[3], 10) || 1;
+        }
+      } catch (err) {
+        console.error('Error searching payments by external reference:', err);
+      }
+    }
+
+    if (approvedPaymentFound) {
+      // Get current Tenant details
+      const { data: tenant, error: fetchErr } = await supabase
+        .from('Tenant')
+        .select('*')
+        .eq('id', tenantId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      let baseDate = new Date();
+      if (tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
+        baseDate = new Date(tenant.subExpiresAt);
+      }
+      baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+
+      // Update Tenant on Supabase directly!
+      const { data: updatedTenant, error: updateErr } = await supabase
+        .from('Tenant')
+        .update({
+          subActive: true,
+          plan: approvedPlan,
+          subExpiresAt: baseDate.toISOString()
+        })
+        .eq('id', tenantId)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+
+      const { count: salesCount } = await supabase
+        .from('Sale')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenantId', tenantId);
+
+      return {
+        success: true,
+        subActive: true,
+        user: {
+          id: user?.id,
+          email: user?.email,
+          name: user?.name,
+          role: user?.role,
+          tenantId: tenantId,
+          plan: updatedTenant.plan,
+          subActive: true,
+          subExpiresAt: updatedTenant.subExpiresAt,
+          salesCount: salesCount || 0
+        }
+      };
+    }
+
+    return { success: false };
+  };
 
   // Parse search params to pre-select plan & fetch prices
   useEffect(() => {
@@ -39,8 +143,25 @@ const SubscriptionPay: React.FC = () => {
 
     const fetchPrices = async () => {
       try {
-        const response = await api.get('/payments/prices');
-        setPrices(response.data);
+        const { data: configPrices, error } = await supabase
+          .from('SystemConfig')
+          .select('key, value');
+        
+        if (error) throw error;
+        
+        let priceStandard = 12320;
+        let pricePro = 15730;
+
+        configPrices?.forEach(cfg => {
+          const val = Number(cfg.value);
+          if (cfg.key === 'price_standard' && !isNaN(val)) priceStandard = val;
+          if (cfg.key === 'price_pro' && !isNaN(val)) pricePro = val;
+        });
+
+        setPrices({
+          price_standard: priceStandard,
+          price_pro: pricePro
+        });
       } catch (err) {
         console.error('Error fetching dynamic plan prices:', err);
       }
@@ -56,17 +177,13 @@ const SubscriptionPay: React.FC = () => {
     if (paymentOpened && qrImageUrl && user && !user.subActive) {
       intervalId = setInterval(async () => {
         try {
-          // check-subscription verifies with MP AND activates in DB if approved
-          const verifyResponse = await api.post('/payments/mercadopago/check-subscription', {
-            plan: selectedPlan,
-            months: selectedMonths
-          });
+          const verifyResponse = await checkAndActivatePayment(selectedPlan, selectedMonths);
 
-          if (verifyResponse.data.success && verifyResponse.data.subActive && verifyResponse.data.user) {
+          if (verifyResponse.success && verifyResponse.subActive && verifyResponse.user) {
             localStorage.removeItem('kiosnet_pending_plan');
             localStorage.removeItem('kiosnet_pending_months');
             setSubscriptionActive(true);
-            setAuth(verifyResponse.data.user, token || '');
+            setAuth(verifyResponse.user as any, token || '');
             clearInterval(intervalId);
           }
         } catch (err) {
@@ -81,17 +198,44 @@ const SubscriptionPay: React.FC = () => {
   }, [paymentOpened, qrImageUrl, user, token, selectedPlan, selectedMonths, setAuth, setSubscriptionActive]);
 
 
-
-
   const handlePaySubscription = async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/payments/mercadopago/subscription', { 
-        plan: selectedPlan, 
-        months: selectedMonths 
-      });
-      const { initPoint } = response.data;
+      const numMonths = selectedMonths;
+      const price = selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard;
+      const finalPrice = price * numMonths;
+      const title = selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
+      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+      const tenantId = user?.tenantId;
+
+      const mpResponse = await axios.post(
+        'https://api.mercadopago.com/checkout/preferences',
+        {
+          items: [
+            {
+              id: planId,
+              title: title,
+              quantity: 1,
+              unit_price: finalPrice,
+              currency_id: 'ARS'
+            }
+          ],
+          back_urls: {
+            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${numMonths}`,
+            failure: `${window.location.origin}/dashboard?sub=failure`,
+            pending: `${window.location.origin}/dashboard?sub=pending`
+          },
+          external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${MP_DEFAULT_TOKEN}`
+          }
+        }
+      );
+
+      const initPoint = mpResponse.data.init_point;
       
       // Save plan/months to localStorage BEFORE redirect so we can use them when MP returns
       localStorage.setItem('kiosnet_pending_plan', selectedPlan);
@@ -101,7 +245,7 @@ const SubscriptionPay: React.FC = () => {
       window.location.href = initPoint;
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.message || 'Error al conectar con Mercado Pago. Inténtalo de nuevo.');
+      setError(err.message || 'Error al conectar con Mercado Pago. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -112,19 +256,48 @@ const SubscriptionPay: React.FC = () => {
     setQrLoading(true);
     setError('');
     try {
-      const response = await api.post('/payments/mercadopago/subscription-qr', { 
-        plan: selectedPlan, 
-        months: selectedMonths 
-      });
+      const numMonths = selectedMonths;
+      const price = selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard;
+      const finalPrice = price * numMonths;
+      const title = selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
+      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+      const tenantId = user?.tenantId;
+
+      const mpResponse = await axios.post(
+        'https://api.mercadopago.com/checkout/preferences',
+        {
+          items: [
+            {
+              id: planId,
+              title: title,
+              quantity: 1,
+              unit_price: finalPrice,
+              currency_id: 'ARS'
+            }
+          ],
+          back_urls: {
+            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${numMonths}`,
+            failure: `${window.location.origin}/dashboard?sub=failure`,
+            pending: `${window.location.origin}/dashboard?sub=pending`
+          },
+          external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${MP_DEFAULT_TOKEN}`
+          }
+        }
+      );
+
+      const initPoint = mpResponse.data.init_point;
+      const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint)}`;
       
-      if (response.data.success && response.data.qrImage) {
-        setQrImageUrl(response.data.qrImage);
-        setQrCodeUrl(response.data.qrCode);
-        setPaymentOpened(true);
-      }
+      setQrImageUrl(qrImage);
+      setQrCodeUrl(initPoint);
+      setPaymentOpened(true);
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.message || 'Error al generar QR. Inténtalo de nuevo.');
+      setError(err.message || 'Error al generar QR. Inténtalo de nuevo.');
     } finally {
       setQrLoading(false);
     }
@@ -134,29 +307,22 @@ const SubscriptionPay: React.FC = () => {
     setChecking(true);
     setError('');
     try {
-      // Step 1: Verify with MP that payment was actually made
-      const verifyResponse = await api.post('/payments/mercadopago/check-subscription', {
-        plan: selectedPlan,
-        months: selectedMonths
-      });
+      const verifyResponse = await checkAndActivatePayment(selectedPlan, selectedMonths);
 
-      if (verifyResponse.data.success && verifyResponse.data.subActive && verifyResponse.data.user) {
-        // Payment confirmed by MP, use the user returned by check-subscription
+      if (verifyResponse.success && verifyResponse.subActive && verifyResponse.user) {
         localStorage.removeItem('kiosnet_pending_plan');
         localStorage.removeItem('kiosnet_pending_months');
         setSubscriptionActive(true);
-        setAuth(verifyResponse.data.user, token || '');
+        setAuth(verifyResponse.user as any, token || '');
       } else {
         setError('El pago aún no fue reportado por Mercado Pago. Si pagaste con QR, esperá 30 segundos más y volvé a intentar. Si usaste el botón y completaste el pago, recargá la página e intentá de nuevo.');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al conectar con el servidor.');
+      setError(err.message || 'Error al conectar con el servidor.');
     } finally {
       setChecking(false);
     }
   };
-
-
 
   const salesCount = user?.salesCount ?? 0;
   const salesPercentage = Math.min((salesCount / 50) * 100, 100);

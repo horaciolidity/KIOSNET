@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Lock, Mail, Loader2, Store, User, ArrowRight } from 'lucide-react';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
 
 const Login: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -23,25 +23,118 @@ const Login: React.FC = () => {
     setSuccess('');
 
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const { user, token, autoRegistered } = response.data;
+      // 1. Authenticate with Supabase Auth
+      let { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       
-      if (autoRegistered) {
+      let sessionUser = data?.user;
+      let isAutoRegistered = false;
+
+      if (authError) {
+        // Handle auto-registration client-side if it matches the previous backend behavior
+        if (authError.message.includes('Invalid login credentials') || authError.message.includes('should be registered')) {
+          try {
+            const signUpRes = await supabase.auth.signUp({ email, password });
+            if (signUpRes.error) throw signUpRes.error;
+            sessionUser = signUpRes.data.user;
+            
+            if (sessionUser) {
+              isAutoRegistered = true;
+              const tenantId = crypto.randomUUID();
+              const autoStoreName = `Comercio de ${email.split('@')[0]}`;
+              
+              await supabase.from('Tenant').insert({
+                id: tenantId,
+                name: autoStoreName,
+                plan: 'FREE',
+                subActive: false
+              });
+
+              await supabase.from('User').insert({
+                id: sessionUser.id,
+                email,
+                name: email.split('@')[0],
+                role: 'ADMIN',
+                active: true,
+                tenantId
+              });
+
+              await supabase.from('Category').insert([
+                { name: 'General', tenantId },
+                { name: 'Bebidas', tenantId },
+                { name: 'Comestibles', tenantId }
+              ]);
+
+              await supabase.from('Setting').insert([
+                { key: 'business_name', value: autoStoreName, tenantId },
+                { key: 'business_phone', value: '', tenantId },
+                { key: 'business_address', value: '', tenantId },
+                { key: 'business_tax_id', value: '', tenantId },
+                { key: 'mercado_pago_active', value: 'false', tenantId }
+              ]);
+
+              // Login again to establish session
+              const reLogin = await supabase.auth.signInWithPassword({ email, password });
+              data = reLogin.data;
+              sessionUser = reLogin.data.user;
+            }
+          } catch (regErr: any) {
+            throw new Error('Credenciales incorrectas o error de conexión');
+          }
+        } else {
+          throw authError;
+        }
+      }
+
+      if (!sessionUser) throw new Error('No se pudo iniciar sesión');
+
+      // 2. Fetch public User and Tenant profile data
+      const { data: dbUser, error: dbUserError } = await supabase
+        .from('User')
+        .select(`
+          id, email, name, role, tenantId,
+          tenant:Tenant(plan, subActive, subExpiresAt)
+        `)
+        .eq('id', sessionUser.id)
+        .single();
+
+      if (dbUserError || !dbUser) {
+        throw new Error('No se encontró el perfil del usuario en la base de datos');
+      }
+
+      const { count } = await supabase
+        .from('Sale')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenantId', dbUser.tenantId);
+
+      const tenant = dbUser.tenant as any;
+      const userObj = {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        role: dbUser.role as 'ADMIN' | 'EMPLOYEE',
+        tenantId: dbUser.tenantId,
+        plan: tenant?.plan || 'FREE',
+        subActive: tenant?.subActive || false,
+        subExpiresAt: tenant?.subExpiresAt || null,
+        salesCount: count || 0
+      };
+
+      if (isAutoRegistered) {
         setSuccess('¡Comercio creado y registrado con éxito! Redirigiendo...');
       } else {
         setSuccess('Sesión iniciada. Redirigiendo...');
       }
-      
+
       setTimeout(() => {
-        setAuth(user, token);
-        if (user.role === 'ADMIN') {
+        setAuth(userObj, data.session?.access_token || '');
+        if (userObj.role === 'ADMIN') {
           navigate('/dashboard');
         } else {
           navigate('/pos');
         }
       }, 1200);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Credenciales incorrectas o error de conexión');
+      setError(err.message || 'Credenciales incorrectas o error de conexión');
       setLoading(false);
     }
   };
@@ -53,27 +146,73 @@ const Login: React.FC = () => {
     setSuccess('');
 
     try {
-      // 1. Register new tenant + admin user
-      await api.post('/auth/register', { 
-        email, 
-        password, 
-        name, 
-        storeName 
+      // 1. Sign up to Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      if (authError) throw authError;
+
+      const sessionUser = authData?.user;
+      if (!sessionUser) throw new Error('No se pudo registrar la cuenta');
+
+      // 2. Provision Tenant, User, Default Categories, Default Settings
+      const tenantId = crypto.randomUUID();
+      
+      const { error: tenantErr } = await supabase.from('Tenant').insert({
+        id: tenantId,
+        name: storeName,
+        plan: 'FREE',
+        subActive: false
       });
+      if (tenantErr) throw tenantErr;
+
+      const { error: userErr } = await supabase.from('User').insert({
+        id: sessionUser.id,
+        email,
+        name,
+        role: 'ADMIN',
+        active: true,
+        tenantId
+      });
+      if (userErr) throw userErr;
+
+      await supabase.from('Category').insert([
+        { name: 'General', tenantId },
+        { name: 'Bebidas', tenantId },
+        { name: 'Comestibles', tenantId }
+      ]);
+
+      await supabase.from('Setting').insert([
+        { key: 'business_name', value: storeName, tenantId },
+        { key: 'business_phone', value: '', tenantId },
+        { key: 'business_address', value: '', tenantId },
+        { key: 'business_tax_id', value: '', tenantId },
+        { key: 'mercado_pago_active', value: 'false', tenantId }
+      ]);
 
       setSuccess('¡Comercio registrado con éxito! Iniciando sesión...');
 
-      // 2. Automated background login for super smooth UX
-      const loginResponse = await api.post('/auth/login', { email, password });
-      const { user, token } = loginResponse.data;
-      
+      // 3. Complete login
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError) throw loginError;
+
+      const userObj = {
+        id: sessionUser.id,
+        email,
+        name,
+        role: 'ADMIN' as const,
+        tenantId,
+        plan: 'FREE',
+        subActive: false,
+        subExpiresAt: null,
+        salesCount: 0
+      };
+
       setTimeout(() => {
-        setAuth(user, token);
-        navigate('/dashboard'); // Will be intercepted by SubscriptionPay!
+        setAuth(userObj, loginData.session?.access_token || '');
+        navigate('/dashboard');
       }, 1500);
 
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al registrar el comercio');
+      setError(err.message || 'Error al registrar el comercio');
       setLoading(false);
     }
   };

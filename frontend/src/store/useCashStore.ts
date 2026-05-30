@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
 import { useAuthStore } from './useAuthStore';
 
 export interface CashTransaction {
@@ -10,7 +10,7 @@ export interface CashTransaction {
   method: 'EFECTIVO' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA' | 'NINGUNO' | 'CUENTA_CORRIENTE';
   description: string;
   timestamp: string;
-  details?: any; // To store items sold, etc.
+  details?: any;
 }
 
 export interface CashSession {
@@ -26,7 +26,7 @@ export interface CashSession {
 
 interface CashState {
   session: CashSession;
-  history: CashTransaction[]; // Permanent history
+  history: CashTransaction[];
   loading: boolean;
   fetchActiveSession: () => Promise<void>;
   openBox: (amount: number) => Promise<void>;
@@ -34,14 +34,12 @@ interface CashState {
   addTransaction: (transaction: Omit<CashTransaction, 'id' | 'timestamp'>) => Promise<void>;
 }
 
-// Map frontend types to database MovementType
 function mapFrontendTypeToDb(type: string, amount: number): 'IN' | 'OUT' {
   if (type === 'EGRESO') return 'OUT';
   if (type === 'INGRESO' || type === 'VENTA' || type === 'PAGO_DEUDA') return 'IN';
   return amount >= 0 ? 'IN' : 'OUT';
 }
 
-// Map database MovementType to frontend types
 function mapDbToFrontendType(type: 'IN' | 'OUT', description: string): 'INGRESO' | 'EGRESO' | 'VENTA' | 'SISTEMA' | 'PAGO_DEUDA' {
   const desc = description.toLowerCase();
   if (desc.includes('venta')) return 'VENTA';
@@ -70,8 +68,15 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      const response = await api.get(`/registers/active/${user.id}`);
-      const reg = response.data;
+      const { data: reg, error } = await supabase
+        .from('CashRegister')
+        .select('*, movements:CashMovement(*)')
+        .eq('userId', user.id)
+        .eq('status', 'OPEN')
+        .eq('tenantId', user.tenantId)
+        .maybeSingle();
+
+      if (error) throw error;
 
       if (reg) {
         // Map database cash register and its movements
@@ -79,15 +84,16 @@ export const useCashStore = create<CashState>((set, get) => ({
           id: m.id,
           type: mapDbToFrontendType(m.type, m.description),
           amount: m.amount,
-          method: 'EFECTIVO', // DB movements track physical cash flow
+          method: 'EFECTIVO',
           description: m.description,
           timestamp: m.createdAt,
         }));
 
-        // Calculate current balance
+        // Sort descending by timestamp
+        mappedTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
         const currentBalance = mappedTransactions.reduce((acc, t) => {
           if (t.type === 'EGRESO') return acc - t.amount;
-          // Apertura doesn't double count if it's already in openingBalance
           if (t.description === 'Apertura de Caja') return acc;
           return acc + t.amount;
         }, reg.openingBalance);
@@ -107,7 +113,6 @@ export const useCashStore = create<CashState>((set, get) => ({
           loading: false,
         });
       } else {
-        // No active session found
         set({
           session: {
             id: '1',
@@ -134,28 +139,40 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      const response = await api.post('/registers/open', {
-        userId: user.id,
-        openingBalance: amount,
-        notes: 'Apertura de Caja'
-      });
-      const reg = response.data;
+      const { data: reg, error: regError } = await supabase
+        .from('CashRegister')
+        .insert({
+          userId: user.id,
+          tenantId: user.tenantId,
+          openingBalance: amount,
+          status: 'OPEN',
+          notes: 'Apertura de Caja'
+        })
+        .select()
+        .single();
 
-      // Add a standard opening cash movement inside this register
-      const openMovement = await api.post('/registers/movements', {
-        registerId: reg.id,
-        amount,
-        type: 'IN',
-        description: 'Apertura de Caja'
-      });
+      if (regError) throw regError;
+
+      const { data: openMovement, error: movError } = await supabase
+        .from('CashMovement')
+        .insert({
+          registerId: reg.id,
+          amount,
+          type: 'IN',
+          description: 'Apertura de Caja'
+        })
+        .select()
+        .single();
+
+      if (movError) throw movError;
 
       const openTx: CashTransaction = {
-        id: openMovement.data.id,
+        id: openMovement.id,
         type: 'SISTEMA',
         amount: amount,
         method: 'EFECTIVO',
         description: 'Apertura de Caja',
-        timestamp: openMovement.data.createdAt
+        timestamp: openMovement.createdAt
       };
 
       set({
@@ -174,8 +191,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       });
     } catch (error: any) {
       console.error('Error opening cash register in Supabase:', error);
-      const errMsg = error.response?.data?.message || 'Error inesperado al abrir la caja';
-      alert(`Error al abrir caja: ${errMsg}`);
+      alert(`Error al abrir caja: ${error.message || 'Error inesperado'}`);
       set({ loading: false });
     }
   },
@@ -186,33 +202,45 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      await api.patch(`/registers/${session.id}/close`, {
-        closingBalance: amount,
-        notes: 'Cierre de Caja'
-      });
+      const { error: regError } = await supabase
+        .from('CashRegister')
+        .update({
+          closingBalance: amount,
+          status: 'CLOSED',
+          closedAt: new Date().toISOString(),
+          notes: 'Cierre de Caja'
+        })
+        .eq('id', session.id);
 
-      // Add a closing cash movement
-      const closeMovement = await api.post('/registers/movements', {
-        registerId: session.id,
-        amount,
-        type: 'OUT',
-        description: 'Cierre de Caja'
-      });
+      if (regError) throw regError;
+
+      const { data: closeMovement, error: movError } = await supabase
+        .from('CashMovement')
+        .insert({
+          registerId: session.id,
+          amount,
+          type: 'OUT',
+          description: 'Cierre de Caja'
+        })
+        .select()
+        .single();
+
+      if (movError) throw movError;
 
       const closeTx: CashTransaction = {
-        id: closeMovement.data.id,
+        id: closeMovement.id,
         type: 'SISTEMA',
         amount: amount,
         method: 'EFECTIVO',
         description: 'Cierre de Caja',
-        timestamp: closeMovement.data.createdAt
+        timestamp: closeMovement.createdAt
       };
 
       set({
         session: {
           ...session,
           isOpen: false,
-          closedAt: closeMovement.data.closedAt,
+          closedAt: new Date().toISOString(),
           closingBalance: amount
         },
         history: [closeTx, ...get().history],
@@ -220,8 +248,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       });
     } catch (error: any) {
       console.error('Error closing cash register in Supabase:', error);
-      const errMsg = error.response?.data?.message || 'Error inesperado al cerrar la caja';
-      alert(`Error al cerrar caja: ${errMsg}`);
+      alert(`Error al cerrar caja: ${error.message || 'Error inesperado'}`);
       set({ loading: false });
     }
   },
@@ -267,14 +294,18 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     // 2. Persist to Supabase
     try {
-      const response = await api.post('/registers/movements', {
-        registerId: session.id,
-        amount: tx.amount,
-        type: mapFrontendTypeToDb(tx.type, tx.amount),
-        description: tx.description
-      });
+      const { data: savedMovement, error: movError } = await supabase
+        .from('CashMovement')
+        .insert({
+          registerId: session.id,
+          amount: tx.amount,
+          type: mapFrontendTypeToDb(tx.type, tx.amount),
+          description: tx.description
+        })
+        .select()
+        .single();
 
-      const savedMovement = response.data;
+      if (movError) throw movError;
 
       // Swap temp ID with actual Supabase ID
       set((state) => ({
@@ -294,9 +325,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       }));
     } catch (error: any) {
       console.error('Error recording movement in Supabase:', error);
-      const errMsg = error.response?.data?.message || 'Error inesperado al registrar el movimiento';
-      alert(`Error al registrar movimiento: ${errMsg}`);
-      // Revert if API failed
+      alert(`Error al registrar movimiento: ${error.message || 'Error inesperado'}`);
       set({
         session,
         history: get().history.filter((t) => t.id !== tempId)

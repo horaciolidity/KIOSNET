@@ -20,7 +20,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useCashStore } from '../store/useCashStore';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -35,10 +35,22 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const response = await api.get('/payments/prices');
-        setPrices(response.data);
+        const { data, error } = await supabase
+          .from('SystemConfig')
+          .select('*');
+
+        if (error) throw error;
+
+        if (data) {
+          const standardPrice = data.find((c: any) => c.key === 'price_standard')?.value;
+          const proPrice = data.find((c: any) => c.key === 'price_pro')?.value;
+          setPrices({
+            price_standard: standardPrice ? Number(standardPrice) : 12320,
+            price_pro: proPrice ? Number(proPrice) : 15730
+          });
+        }
       } catch (err) {
-        console.error('Error fetching plan prices:', err);
+        console.error('Error fetching plan prices from Supabase:', err);
       }
     };
     fetchPrices();

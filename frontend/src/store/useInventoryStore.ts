@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
+import { useAuthStore } from './useAuthStore';
 
 export type ProductUnit = 'UNIDAD' | 'KILO' | 'LITRO';
 export type ProductCategory = 'Lacteos' | 'Panaderia' | 'Bebidas' | 'Cigarrillos' | 'Fiambreria' | 'Otros';
@@ -27,19 +28,30 @@ interface InventoryState {
   deleteProduct: (id: string) => Promise<void>;
 }
 
-// Helper to get or create categoryId on backend by name
-async function getOrCreateCategoryId(categoryName: string): Promise<string> {
+// Helper to get or create categoryId on Supabase by name
+async function getOrCreateCategoryId(categoryName: string, tenantId: string): Promise<string> {
   try {
-    const catsResponse = await api.get('/categories');
-    const categories = catsResponse.data;
-    
-    const found = categories.find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
+    const { data: categories, error: getError } = await supabase
+      .from('Category')
+      .select('id, name')
+      .eq('tenantId', tenantId);
+
+    if (getError) throw getError;
+
+    const found = categories?.find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
     if (found) return found.id;
-    
-    const createResponse = await api.post('/categories', { name: categoryName });
-    return createResponse.data.id;
+
+    // Create category if it doesn't exist
+    const { data: newCat, error: createError } = await supabase
+      .from('Category')
+      .insert({ name: categoryName, tenantId })
+      .select('id')
+      .single();
+
+    if (createError) throw createError;
+    return newCat.id;
   } catch (e) {
-    console.error('Error resolving category in backend:', e);
+    console.error('Error resolving category in Supabase:', e);
     return 'Otros';
   }
 }
@@ -49,10 +61,20 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   loading: false,
 
   fetchProducts: async () => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     set({ loading: true });
     try {
-      const response = await api.get('/products');
-      const mapped = response.data.map((p: any) => ({
+      const { data, error } = await supabase
+        .from('Product')
+        .select('*, category:Category(name)')
+        .eq('tenantId', tenantId)
+        .eq('active', true);
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((p: any) => ({
         id: p.id,
         name: p.name,
         barcode: p.barcode || '',
@@ -73,7 +95,10 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 
   addProduct: async (productData) => {
-    // 1. Optimistic Update (zero latency UI!)
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
+    // 1. Optimistic Update
     const tempId = 'temp-' + Math.random().toString(36).substr(2, 9);
     const newProductTemp: Product = {
       ...productData,
@@ -85,22 +110,50 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
       products: [...state.products, newProductTemp],
     }));
 
-    // 2. Persist to Supabase via backend in the background
+    // 2. Persist to Supabase
     try {
-      const categoryId = await getOrCreateCategoryId(productData.category);
+      const categoryId = await getOrCreateCategoryId(productData.category, tenantId);
+
+      // Check barcode uniqueness
+      if (productData.barcode) {
+        const { data: existing } = await supabase
+          .from('Product')
+          .select('id')
+          .eq('barcode', productData.barcode)
+          .eq('tenantId', tenantId)
+          .eq('active', true)
+          .maybeSingle();
+
+        if (existing) {
+          alert('Ya tienes un producto registrado con este código de barras');
+          // Revert optimistic update
+          set((state) => ({
+            products: state.products.filter((p) => p.id !== tempId),
+          }));
+          return;
+        }
+      }
+
       const payload = {
         name: productData.name,
-        barcode: productData.barcode,
+        barcode: productData.barcode || null,
         categoryId,
-        costPrice: productData.costPrice,
-        sellingPrice: productData.price, // map price to sellingPrice
-        stock: productData.stock,
-        minStock: productData.minStock,
+        costPrice: Number(productData.costPrice),
+        sellingPrice: Number(productData.price),
+        stock: Number(productData.stock),
+        minStock: Number(productData.minStock),
         unit: productData.unit,
+        tenantId,
+        active: true
       };
 
-      const response = await api.post('/products', payload);
-      const savedProduct = response.data;
+      const { data: savedProduct, error: insertError } = await supabase
+        .from('Product')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
 
       // Swap the temp ID with the real DB ID
       set((state) => ({
@@ -120,6 +173,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 
   updateProduct: async (id, productData) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalProducts = get().products;
     set((state) => ({
@@ -130,22 +186,31 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     try {
       let categoryId: string | undefined;
       if (productData.category) {
-        categoryId = await getOrCreateCategoryId(productData.category);
+        categoryId = await getOrCreateCategoryId(productData.category, tenantId);
       }
 
-      const payload = {
+      const payload: any = {
         name: productData.name,
-        barcode: productData.barcode,
+        barcode: productData.barcode || null,
         categoryId,
-        costPrice: productData.costPrice,
-        sellingPrice: productData.price, // map price to sellingPrice
-        stock: productData.stock,
-        minStock: productData.minStock,
+        costPrice: productData.costPrice !== undefined ? Number(productData.costPrice) : undefined,
+        sellingPrice: productData.price !== undefined ? Number(productData.price) : undefined,
+        stock: productData.stock !== undefined ? Number(productData.stock) : undefined,
+        minStock: productData.minStock !== undefined ? Number(productData.minStock) : undefined,
         unit: productData.unit,
         active: productData.active,
       };
 
-      await api.put(`/products/${id}`, payload);
+      // Clean undefined keys
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+      const { error: updateError } = await supabase
+        .from('Product')
+        .update(payload)
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (updateError) throw updateError;
     } catch (error) {
       console.error('Error updating product in Supabase:', error);
       // Revert if API call fails
@@ -154,6 +219,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 
   deleteProduct: async (id) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalProducts = get().products;
     set((state) => ({
@@ -162,7 +230,13 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
     // 2. Persist to Supabase (Soft Delete)
     try {
-      await api.delete(`/products/${id}`);
+      const { error: deleteError } = await supabase
+        .from('Product')
+        .update({ active: false })
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (deleteError) throw deleteError;
     } catch (error) {
       console.error('Error soft-deleting product in Supabase:', error);
       // Revert if API call fails

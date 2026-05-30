@@ -16,7 +16,7 @@ import {
   Calendar,
   Power
 } from 'lucide-react';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
 
 interface TenantUser {
   id: string;
@@ -59,15 +59,59 @@ const SuperAdmin: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/dashboard');
-      setTenants(response.data.tenants);
-      setPrices(response.data.prices);
+      // Fetch tenants along with users and sales
+      const { data: tenantsData, error: tenantsError } = await supabase
+        .from('Tenant')
+        .select(`
+          id, name, email, phone, address, plan, subActive, subExpiresAt, createdAt,
+          users:User(id, email, name, role, active, createdAt),
+          sales:Sale(id)
+        `)
+        .order('createdAt', { ascending: false });
+
+      if (tenantsError) throw tenantsError;
+
+      // Fetch pricing config
+      const { data: configPrices, error: pricesError } = await supabase
+        .from('SystemConfig')
+        .select('key, value');
+
+      if (pricesError) throw pricesError;
+
+      let priceStandard = 12320;
+      let pricePro = 15730;
+
+      configPrices?.forEach(cfg => {
+        const val = Number(cfg.value);
+        if (cfg.key === 'price_standard' && !isNaN(val)) priceStandard = val;
+        if (cfg.key === 'price_pro' && !isNaN(val)) pricePro = val;
+      });
+
+      const mappedTenants: Tenant[] = (tenantsData || []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        email: t.email,
+        phone: t.phone,
+        address: t.address,
+        plan: t.plan,
+        subActive: t.subActive,
+        subExpiresAt: t.subExpiresAt,
+        createdAt: t.createdAt,
+        salesCount: t.sales?.length || 0,
+        users: t.users || []
+      }));
+
+      setTenants(mappedTenants);
+      setPrices({
+        price_standard: priceStandard,
+        price_pro: pricePro
+      });
       setFeedbackMessage(null);
     } catch (error: any) {
       console.error('Error fetching admin dashboard:', error);
       setFeedbackMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Error al conectar con el servidor.'
+        text: error.message || 'Error al conectar con la base de datos de Supabase.'
       });
     } finally {
       setLoading(false);
@@ -89,12 +133,24 @@ const SuperAdmin: React.FC = () => {
   const savePrices = async () => {
     try {
       setSavingPrices(true);
-      await api.post('/admin/prices', prices);
+      
+      const { error: errStandard } = await supabase
+        .from('SystemConfig')
+        .upsert({ key: 'price_standard', value: String(prices.price_standard) });
+        
+      if (errStandard) throw errStandard;
+
+      const { error: errPro } = await supabase
+        .from('SystemConfig')
+        .upsert({ key: 'price_pro', value: String(prices.price_pro) });
+
+      if (errPro) throw errPro;
+
       setFeedbackMessage({ type: 'success', text: 'Precios de suscripción actualizados con éxito en la base de datos.' });
       setTimeout(() => setFeedbackMessage(null), 4000);
     } catch (error: any) {
       console.error('Error saving prices:', error);
-      setFeedbackMessage({ type: 'error', text: error.response?.data?.message || 'Error al guardar los precios.' });
+      setFeedbackMessage({ type: 'error', text: error.message || 'Error al guardar los precios.' });
     } finally {
       setSavingPrices(false);
     }
@@ -114,26 +170,64 @@ const SuperAdmin: React.FC = () => {
   const handleToggleTenantStatus = async (tenantId: string, subActive: boolean, days?: number, plan?: string) => {
     try {
       setTogglingTenantId(tenantId);
-      const response = await api.post(`/admin/tenants/${encodeURIComponent(tenantId)}/toggle-status`, {
-        subActive,
-        ...(days !== undefined ? { days } : {}),
-        ...(plan ? { plan } : {})
-      });
+
+      // Get current tenant data
+      const { data: tenant, error: fetchErr } = await supabase
+        .from('Tenant')
+        .select('*')
+        .eq('id', tenantId)
+        .single();
+
+      if (fetchErr || !tenant) {
+        throw new Error('Comercio no encontrado.');
+      }
+
+      const newStatus = subActive !== undefined ? subActive : !tenant.subActive;
+      
+      // Calculate new expiry
+      let newExpiresAt: string | null = tenant.subExpiresAt;
+      if (newStatus && days !== undefined) {
+        const numDays = parseInt(String(days), 10);
+        if (numDays > 0) {
+          const baseDate = (tenant.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date())
+            ? new Date(tenant.subExpiresAt)
+            : new Date();
+          baseDate.setDate(baseDate.getDate() + numDays);
+          newExpiresAt = baseDate.toISOString();
+        }
+      }
+
+      const updateData: any = { subActive: newStatus };
+      if (plan) updateData.plan = plan;
+      if (newExpiresAt) updateData.subExpiresAt = newExpiresAt;
+
+      const { data: updatedTenant, error: updateErr } = await supabase
+        .from('Tenant')
+        .update(updateData)
+        .eq('id', tenantId)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+
+      const daysMsg = days && days > 0
+        ? ` por ${days} días (hasta ${new Date(newExpiresAt!).toLocaleDateString('es-AR')})` 
+        : '';
+
       setFeedbackMessage({
         type: 'success',
-        text: response.data.message
+        text: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? `activado${daysMsg}` : 'desactivado'} exitosamente.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
       
       // Update local state with returned tenant data and refresh the dashboard.
-      const updatedTenantData = response.data.tenant;
       setTenants(prev => prev.map(t => 
         t.id === tenantId 
           ? { 
               ...t, 
-              subActive: updatedTenantData.subActive,
-              subExpiresAt: updatedTenantData.subExpiresAt || t.subExpiresAt,
-              plan: updatedTenantData.plan || t.plan
+              subActive: updatedTenant.subActive,
+              subExpiresAt: updatedTenant.subExpiresAt || t.subExpiresAt,
+              plan: updatedTenant.plan || t.plan
             } 
           : t
       ));
@@ -143,7 +237,7 @@ const SuperAdmin: React.FC = () => {
       console.error('Error toggling tenant status:', error);
       setFeedbackMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Error al cambiar el estado del comercio.'
+        text: error.message || 'Error al cambiar el estado del comercio.'
       });
     } finally {
       setTogglingTenantId(null);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import api from '../utils/api';
+import { supabase } from '../utils/supabaseClient';
+import { useAuthStore } from './useAuthStore';
 
 export interface Customer {
   id: string;
@@ -28,16 +29,25 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   loading: false,
 
   fetchCustomers: async () => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     set({ loading: true });
     try {
-      const response = await api.get('/customers');
-      const mapped = response.data.map((c: any) => ({
+      const { data, error } = await supabase
+        .from('Customer')
+        .select('*, sales:Sale(createdAt)')
+        .eq('tenantId', tenantId);
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         phone: c.phone || '',
-        document: c.address || '', // Map document <-> address
-        debt: c.balance || 0,      // Map debt <-> balance
-        limit: c.creditLimit || 0, // Map limit <-> creditLimit
+        document: c.address || '',
+        debt: c.balance || 0,
+        limit: c.creditLimit || 0,
         lastPurchase: c.sales && c.sales.length > 0 ? c.sales[c.sales.length - 1].createdAt : undefined,
         createdAt: c.createdAt,
       }));
@@ -49,6 +59,9 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
 
   addCustomer: async (customerData) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const tempId = 'temp-' + Math.random().toString(36).substr(2, 9);
     const newCustomerTemp: Customer = {
@@ -67,12 +80,19 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       const payload = {
         name: customerData.name,
         phone: customerData.phone,
-        address: customerData.document || '', // Map document -> address
-        creditLimit: customerData.limit,
+        address: customerData.document || '',
+        creditLimit: Number(customerData.limit),
+        balance: 0,
+        tenantId
       };
 
-      const response = await api.post('/customers', payload);
-      const savedCustomer = response.data;
+      const { data: savedCustomer, error: insertError } = await supabase
+        .from('Customer')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
 
       set((state) => ({
         customers: state.customers.map((c) => c.id === tempId ? {
@@ -91,6 +111,9 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
 
   updateCustomer: async (id, customerData) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalCustomers = get().customers;
     set((state) => ({
@@ -99,15 +122,24 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
     // 2. Persist to Supabase
     try {
-      const payload = {
+      const payload: any = {
         name: customerData.name,
         phone: customerData.phone,
-        address: customerData.document, // Map document -> address
-        creditLimit: customerData.limit,
-        balance: customerData.debt,     // Map debt -> balance
+        address: customerData.document,
+        creditLimit: customerData.limit !== undefined ? Number(customerData.limit) : undefined,
+        balance: customerData.debt !== undefined ? Number(customerData.debt) : undefined,
       };
 
-      await api.put(`/customers/${id}`, payload);
+      // Clean undefined keys
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+      const { error: updateError } = await supabase
+        .from('Customer')
+        .update(payload)
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (updateError) throw updateError;
     } catch (error) {
       console.error('Error updating customer in Supabase:', error);
       // Revert if failed
@@ -116,6 +148,9 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
 
   deleteCustomer: async (id) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalCustomers = get().customers;
     set((state) => ({
@@ -124,7 +159,13 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
     // 2. Persist to Supabase
     try {
-      await api.delete(`/customers/${id}`);
+      const { error: deleteError } = await supabase
+        .from('Customer')
+        .delete()
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (deleteError) throw deleteError;
     } catch (error) {
       console.error('Error deleting customer in Supabase:', error);
       // Revert if failed
@@ -133,6 +174,9 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
 
   addDebt: async (id, amount) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalCustomers = get().customers;
     const target = originalCustomers.find(c => c.id === id);
@@ -150,7 +194,13 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
     // 2. Persist to Supabase
     try {
-      await api.put(`/customers/${id}`, { balance: newDebt });
+      const { error: updateError } = await supabase
+        .from('Customer')
+        .update({ balance: newDebt })
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (updateError) throw updateError;
     } catch (error) {
       console.error('Error adding debt in Supabase:', error);
       // Revert if failed
@@ -159,6 +209,9 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
 
   payDebt: async (id, amount) => {
+    const tenantId = useAuthStore.getState().user?.tenantId;
+    if (!tenantId) return;
+
     // 1. Optimistic Update
     const originalCustomers = get().customers;
     const target = originalCustomers.find(c => c.id === id);
@@ -175,7 +228,13 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
     // 2. Persist to Supabase
     try {
-      await api.put(`/customers/${id}`, { balance: newDebt });
+      const { error: updateError } = await supabase
+        .from('Customer')
+        .update({ balance: newDebt })
+        .eq('id', id)
+        .eq('tenantId', tenantId);
+
+      if (updateError) throw updateError;
     } catch (error) {
       console.error('Error paying debt in Supabase:', error);
       // Revert if failed

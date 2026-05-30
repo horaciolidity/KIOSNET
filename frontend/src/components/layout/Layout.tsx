@@ -23,7 +23,8 @@ import {
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useThemeStore } from '../../store/useThemeStore';
-import api from '../../utils/api';
+import { supabase } from '../../utils/supabaseClient';
+import axios from 'axios';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -71,71 +72,180 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const params = new URLSearchParams(location.search);
     const subStatus = params.get('sub');
 
-    if (subStatus === 'success') {
-      const plan = params.get('plan') || localStorage.getItem('kiosnet_pending_plan') || 'STANDARD';
-      const months = params.get('months') || localStorage.getItem('kiosnet_pending_months') || '1';
-      // MP appends payment_id to the back_url on success:
+    if (subStatus === 'success' && user) {
+      const plan = (params.get('plan') || localStorage.getItem('kiosnet_pending_plan') || 'STANDARD') as 'STANDARD' | 'PRO';
+      const months = parseInt(params.get('months') || localStorage.getItem('kiosnet_pending_months') || '1', 10) || 1;
       const paymentId = params.get('payment_id');
 
-      // MP redirects to success URL only after payment confirmation on their end.
-      // We retry up to 5 times with 3s intervals to handle MP's internal processing delay.
       const activateSub = async () => {
         const maxRetries = 5;
         let attempt = 0;
 
-        const tryActivate = async (): Promise<void> => {
+        const tryActivate = async (): Promise<boolean> => {
           attempt++;
+          const tenantId = user.tenantId;
+          const mpToken = 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+          let approvedPaymentFound = false;
+          let approvedPlan = plan;
+          let approvedMonths = months;
+
           try {
-            const response = await api.post('/payments/mercadopago/check-subscription', {
-              plan,
-              months,
-              // Pass payment_id for direct (instant) lookup if MP provided it
-              ...(paymentId ? { paymentId } : {})
-            });
-            if (response.data.success && response.data.subActive && response.data.user) {
+            // Strategy 1: Direct payment lookup if we have paymentId
+            if (paymentId) {
+              const pResponse = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+                headers: { Authorization: `Bearer ${mpToken}` }
+              });
+              const paymentInfo = pResponse.data;
+              if (paymentInfo.status === 'approved' && paymentInfo.external_reference?.startsWith('sub_')) {
+                approvedPaymentFound = true;
+                const parts = paymentInfo.external_reference.split('_');
+                approvedPlan = (parts[1] || plan) as 'STANDARD' | 'PRO';
+                approvedMonths = parseInt(parts[3], 10) || months;
+              }
+            }
+
+            // Strategy 2: Search by external_reference
+            if (!approvedPaymentFound) {
+              const ref = `sub_${plan}_${tenantId}_${months}`;
+              const searchResponse = await axios.get(`https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`, {
+                headers: { Authorization: `Bearer ${mpToken}` }
+              });
+              const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');
+              if (approvedPayment) {
+                approvedPaymentFound = true;
+                const parts = ref.split('_');
+                approvedPlan = parts[1] as 'STANDARD' | 'PRO';
+                approvedMonths = parseInt(parts[3], 10) || 1;
+              }
+            }
+
+            if (approvedPaymentFound) {
+              // Update database
+              const { data: tenant, error: fetchErr } = await supabase
+                .from('Tenant')
+                .select('*')
+                .eq('id', tenantId)
+                .single();
+
+              if (fetchErr) throw fetchErr;
+
+              let baseDate = new Date();
+              if (tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
+                baseDate = new Date(tenant.subExpiresAt);
+              }
+              baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+
+              const { data: updatedTenant, error: updateErr } = await supabase
+                .from('Tenant')
+                .update({
+                  subActive: true,
+                  plan: approvedPlan,
+                  subExpiresAt: baseDate.toISOString()
+                })
+                .eq('id', tenantId)
+                .select()
+                .single();
+
+              if (updateErr) throw updateErr;
+
+              const { count: salesCount } = await supabase
+                .from('Sale')
+                .select('*', { count: 'exact', head: true })
+                .eq('tenantId', tenantId);
+
               localStorage.removeItem('kiosnet_pending_plan');
               localStorage.removeItem('kiosnet_pending_months');
-              setAuth(response.data.user, token || '');
-              // Clear URL params without reload
+
+              setAuth({
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                tenantId: tenantId,
+                plan: updatedTenant.plan,
+                subActive: true,
+                subExpiresAt: updatedTenant.subExpiresAt,
+                salesCount: salesCount || 0
+              }, token || '');
+
               navigate(location.pathname, { replace: true });
-              return;
+              return true;
             }
           } catch (err) {
             console.error(`Activation attempt ${attempt} failed:`, err);
           }
-
-          if (attempt < maxRetries) {
-            // Wait 3 seconds and try again
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            return tryActivate();
-          } else {
-            console.warn('Could not verify subscription via check-subscription, trying direct activation...');
-            try {
-              const fallbackResponse = await api.post('/payments/mercadopago/activate-subscription', {
-                plan,
-                months
-              });
-              if (fallbackResponse.data.success && fallbackResponse.data.user) {
-                localStorage.removeItem('kiosnet_pending_plan');
-                localStorage.removeItem('kiosnet_pending_months');
-                setAuth(fallbackResponse.data.user, token || '');
-                navigate(location.pathname, { replace: true });
-                return;
-              }
-            } catch (fallbackErr) {
-              console.error('Fallback activation failed:', fallbackErr);
-            }
-          }
+          return false;
         };
 
-        // First attempt after 2 seconds to give MP time to process
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await tryActivate();
+        // Try activate with retries
+        for (let i = 0; i < maxRetries; i++) {
+          const success = await tryActivate();
+          if (success) return;
+          if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        }
+
+        // Fallback: Direct activation if MP redirects but API search is delayed
+        try {
+          console.warn('Fallback direct activation activated');
+          const tenantId = user.tenantId;
+          const { data: tenant, error: fetchErr } = await supabase
+            .from('Tenant')
+            .select('*')
+            .eq('id', tenantId)
+            .single();
+
+          if (!fetchErr && tenant) {
+            let baseDate = new Date();
+            if (tenant.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
+              baseDate = new Date(tenant.subExpiresAt);
+            }
+            baseDate.setMonth(baseDate.getMonth() + months);
+
+            const { data: updatedTenant, error: updateErr } = await supabase
+              .from('Tenant')
+              .update({
+                subActive: true,
+                plan: plan,
+                subExpiresAt: baseDate.toISOString()
+              })
+              .eq('id', tenantId)
+              .select()
+              .single();
+
+            if (!updateErr && updatedTenant) {
+              const { count: salesCount } = await supabase
+                .from('Sale')
+                .select('*', { count: 'exact', head: true })
+                .eq('tenantId', tenantId);
+
+              localStorage.removeItem('kiosnet_pending_plan');
+              localStorage.removeItem('kiosnet_pending_months');
+
+              setAuth({
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                tenantId: tenantId,
+                plan: updatedTenant.plan,
+                subActive: true,
+                subExpiresAt: updatedTenant.subExpiresAt,
+                salesCount: salesCount || 0
+              }, token || '');
+
+              navigate(location.pathname, { replace: true });
+            }
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback activation failed:', fallbackErr);
+        }
       };
+
       activateSub();
     }
-  }, [location.search, navigate, location.pathname, token, setAuth]);
-
+  }, [location.search, navigate, location.pathname, token, setAuth, user]);
 
   const isEmployee = user?.role === 'EMPLOYEE';
 

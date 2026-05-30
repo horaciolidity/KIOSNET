@@ -24,7 +24,6 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useCashStore } from '../store/useCashStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useAuthStore } from '../store/useAuthStore';
-import api from '../utils/api';
 
 interface CartItem extends Product {
   quantity: number;
@@ -170,25 +169,80 @@ const POS: React.FC = () => {
     }
 
     try {
-      const payload = {
-        total,
-        subtotal: total,
-        discount: 0,
-        paymentMethod: paymentMethod === 'EFECTIVO' ? 'CASH' : paymentMethod === 'CUENTA_CORRIENTE' ? 'CREDIT' : 'TRANSFER',
-        customerId: selectedCustomerId || null,
-        sellerId: user.id,
-        receivedAmount: Number(amountPaid) || total,
-        changeAmount: change,
-        items: cart.map(item => ({
-          productId: item.id,
-          quantity: item.quantity,
-          price: item.price,
-          costPrice: item.costPrice
-        }))
-      };
+      // 1. Verify billing limits (max 50 sales for free tier)
+      const { count: salesCount } = await supabase
+        .from('Sale')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenantId', user.tenantId);
 
-      const response = await api.post('/sales', payload);
-      const savedSale = response.data;
+      if (!user.subActive && salesCount !== null && salesCount >= 50) {
+        alert('Límite de ventas gratuitas (50 ventas) alcanzado. Por favor, activa tu suscripción en Configuración para continuar.');
+        return;
+      }
+
+      const newSaleId = crypto.randomUUID();
+
+      // 2. Create the sale in Supabase
+      const { error: saleErr } = await supabase
+        .from('Sale')
+        .insert({
+          id: newSaleId,
+          total: Number(total),
+          subtotal: Number(total),
+          discount: 0,
+          paymentMethod: paymentMethod === 'EFECTIVO' ? 'CASH' : paymentMethod === 'CUENTA_CORRIENTE' ? 'CREDIT' : 'TRANSFER',
+          customerId: selectedCustomerId || null,
+          sellerId: user.id,
+          tenantId: user.tenantId,
+          receivedAmount: Number(amountPaid) || total,
+          changeAmount: change,
+          status: 'COMPLETED'
+        });
+
+      if (saleErr) throw saleErr;
+
+      // 3. Create sale items
+      const { error: itemsErr } = await supabase
+        .from('SaleItem')
+        .insert(cart.map(item => ({
+          saleId: newSaleId,
+          productId: item.id,
+          quantity: Number(item.quantity),
+          price: Number(item.price),
+          costPrice: Number(item.costPrice)
+        })));
+
+      if (itemsErr) throw itemsErr;
+
+      // 4. Decrement physical stock for each product
+      for (const item of cart) {
+        const { data: prod } = await supabase
+          .from('Product')
+          .select('stock')
+          .eq('id', item.id)
+          .single();
+
+        const currentStock = prod?.stock || 0;
+        await supabase
+          .from('Product')
+          .update({ stock: currentStock - item.quantity })
+          .eq('id', item.id);
+      }
+
+      // 5. Update customer balance if fia (CREDIT)
+      if (paymentMethod === 'CUENTA_CORRIENTE' && selectedCustomerId) {
+        const { data: cust } = await supabase
+          .from('Customer')
+          .select('balance')
+          .eq('id', selectedCustomerId)
+          .single();
+
+        const currentBalance = cust?.balance || 0;
+        await supabase
+          .from('Customer')
+          .update({ balance: currentBalance + total })
+          .eq('id', selectedCustomerId);
+      }
 
       const customer = customers.find(c => c.id === selectedCustomerId);
       const customerName = customer ? customer.name : '';
@@ -198,7 +252,7 @@ const POS: React.FC = () => {
         amount: total,
         profit: profit,
         method: paymentMethod === 'MERCADOPAGO' ? 'TRANSFERENCIA' as any : paymentMethod as any,
-        description: `Venta ${savedSale.id} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
+        description: `Venta ${newSaleId} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
         details: {
           items: cart.map(item => ({
             name: item.name,
@@ -206,7 +260,7 @@ const POS: React.FC = () => {
             price: item.price,
             category: item.category
           })),
-          saleId: savedSale.id,
+          saleId: newSaleId,
           note: note,
           customerId: selectedCustomerId
         }
@@ -216,7 +270,7 @@ const POS: React.FC = () => {
       useInventoryStore.getState().fetchProducts();
       useCustomerStore.getState().fetchCustomers();
 
-      setSaleId(savedSale.id);
+      setSaleId(newSaleId);
       setIsFinished(true);
       setIsWaitingForMP(false);
       
@@ -230,9 +284,9 @@ const POS: React.FC = () => {
       }
       
       useSettingsStore.getState().incrementSales();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error finalizando la venta:', error);
-      alert('Hubo un error al procesar la venta en el servidor.');
+      alert(`Hubo un error al procesar la venta: ${error.message || 'Error inesperado'}`);
     }
   };
 
@@ -250,31 +304,99 @@ const POS: React.FC = () => {
     if (paymentMethod === 'MERCADOPAGO') {
       setIsWaitingForMP(true);
       try {
-        const payload = {
-          total,
-          customerId: selectedCustomerId || null,
-          sellerId: user.id,
-          items: cart.map(item => ({
-            productId: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            costPrice: item.costPrice
-          }))
-        };
+        const pendingSaleId = crypto.randomUUID();
 
-        const res = await api.post('/payments/mercadopago/preference', payload);
-        const { initPoint, saleId: pendingSaleId } = res.data;
+        // 1. Create pending sale in DB
+        const { error: saleErr } = await supabase
+          .from('Sale')
+          .insert({
+            id: pendingSaleId,
+            total: Number(total),
+            subtotal: Number(total),
+            discount: 0,
+            paymentMethod: 'TRANSFER',
+            customerId: selectedCustomerId || null,
+            sellerId: user.id,
+            tenantId: user.tenantId,
+            receivedAmount: total,
+            changeAmount: 0,
+            status: 'PENDING'
+          });
 
+        if (saleErr) throw saleErr;
+
+        // 2. Request Mercado Pago Checkout preference directly
+        const token = businessInfo?.mercadoPago?.accessToken || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+        const mpResponse = await axios.post(
+          'https://api.mercadopago.com/checkout/preferences',
+          {
+            items: cart.map(item => ({
+              id: item.id,
+              title: item.name,
+              quantity: Number(item.quantity),
+              unit_price: Number(item.price),
+              currency_id: 'ARS'
+            })),
+            external_reference: pendingSaleId
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        const initPoint = mpResponse.data.init_point;
         setSaleId(pendingSaleId);
         setMpInitPoint(initPoint);
 
-        // Start polling the server for sale status
+        // 3. Poll Mercado Pago API directly to check if the payment is approved
         const pollInterval = setInterval(async () => {
           try {
-            const statusRes = await api.get(`/sales/status/${pendingSaleId}`);
-            if (statusRes.data.status === 'COMPLETED') {
+            const mpSearchResponse = await axios.get(
+              `https://api.mercadopago.com/v1/payments/search?external_reference=${pendingSaleId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`
+                }
+              }
+            );
+
+            const approvedPayment = mpSearchResponse.data.results?.find((p: any) => p.status === 'approved');
+            if (approvedPayment) {
               clearInterval(pollInterval);
+
+              // 4. Mark sale as completed in Supabase
+              await supabase
+                .from('Sale')
+                .update({ status: 'COMPLETED' })
+                .eq('id', pendingSaleId);
+
+              // 5. Create sale items
+              await supabase
+                .from('SaleItem')
+                .insert(cart.map(item => ({
+                  saleId: pendingSaleId,
+                  productId: item.id,
+                  quantity: Number(item.quantity),
+                  price: Number(item.price),
+                  costPrice: Number(item.costPrice)
+                })));
+
+              // 6. Decrement physical stock
+              for (const item of cart) {
+                const { data: prod } = await supabase
+                  .from('Product')
+                  .select('stock')
+                  .eq('id', item.id)
+                  .single();
+
+                const currentStock = prod?.stock || 0;
+                await supabase
+                  .from('Product')
+                  .update({ stock: currentStock - item.quantity })
+                  .eq('id', item.id);
+              }
               
               // Refresh stores
               useInventoryStore.getState().fetchProducts();
@@ -298,7 +420,7 @@ const POS: React.FC = () => {
                     category: item.category
                   })),
                   saleId: pendingSaleId,
-                  note: 'Aprobado vía Mercado Pago Webhook',
+                  note: 'Aprobado vía Consulta Directa a Mercado Pago',
                   customerId: selectedCustomerId
                 }
               });
@@ -309,14 +431,14 @@ const POS: React.FC = () => {
               useSettingsStore.getState().incrementSales();
             }
           } catch (err) {
-            console.error('Error polling status:', err);
+            console.error('Error polling status from Mercado Pago:', err);
           }
         }, 2000);
 
         // Store poll interval globally to clear it later
         (window as any).mpPollInterval = pollInterval;
 
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error starting Mercado Pago transaction:', error);
         alert('Hubo un error al conectar con Mercado Pago. Intente nuevamente.');
         setIsWaitingForMP(false);
