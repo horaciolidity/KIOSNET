@@ -97,8 +97,18 @@ const POS: React.FC = () => {
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prevCart => prevCart.map(item => {
       if (item.id === productId) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
+        const step = item.unit === 'UNIDAD' ? 1 : 0.1;
+        const newQty = Math.max(step, item.quantity + (delta * step));
+        return { ...item, quantity: parseFloat(newQty.toFixed(3)) };
+      }
+      return item;
+    }));
+  };
+
+  const updateQuantityDirect = (productId: string, qty: number) => {
+    setCart(prevCart => prevCart.map(item => {
+      if (item.id === productId) {
+        return { ...item, quantity: parseFloat(Math.max(0.001, qty).toFixed(3)) };
       }
       return item;
     }));
@@ -449,7 +459,12 @@ const POS: React.FC = () => {
                 <h3 className="font-bold text-slate-900 dark:text-white line-clamp-2 h-10 mb-2 leading-tight">
                   {product.name}
                 </h3>
-                <p className="text-xl font-black text-blue-600">${product.price.toLocaleString()}</p>
+                <p className="text-xl font-black text-blue-600">
+                  ${product.price.toLocaleString()}
+                  <span className="text-xs text-slate-400 font-medium ml-1">
+                    / {product.unit === 'KILO' ? 'Kg' : product.unit === 'LITRO' ? 'L' : 'Ud'}
+                  </span>
+                </p>
                 {product.stock <= product.minStock && (
                   <span className="absolute top-4 right-4 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
@@ -487,13 +502,50 @@ const POS: React.FC = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-900 dark:text-white truncate text-sm">{item.name}</p>
+                  <p className="text-slate-400 text-xs font-semibold">
+                    {item.unit === 'KILO' 
+                      ? `${Math.round(item.quantity * 1000)}g x $${item.price.toLocaleString()}/Kg` 
+                      : item.unit === 'LITRO' 
+                        ? `${Math.round(item.quantity * 1000)}cc x $${item.price.toLocaleString()}/L` 
+                        : `${item.quantity} Ud x $${item.price.toLocaleString()}/Ud`
+                    }
+                  </p>
                   <p className="text-blue-600 font-black text-sm">${(item.price * item.quantity).toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-blue-600"><Minus size={16} /></button>
-                  <span className="w-6 text-center font-black text-sm">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-blue-600"><Plus size={16} /></button>
-                </div>
+                {item.unit === 'KILO' || item.unit === 'LITRO' ? (
+                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <input 
+                      type="number"
+                      min="1"
+                      step="10"
+                      value={Math.round(item.quantity * 1000)}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        updateQuantityDirect(item.id, val / 1000);
+                      }}
+                      className="w-16 bg-transparent text-right font-black text-sm outline-none border-b border-dashed border-slate-300 focus:border-blue-500"
+                    />
+                    <span className="text-[10px] font-bold text-slate-400 pr-1">
+                      {item.unit === 'KILO' ? 'g' : 'cc'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-blue-600"><Minus size={16} /></button>
+                    <input 
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 1;
+                        updateQuantityDirect(item.id, Math.max(1, val));
+                      }}
+                      className="w-8 bg-transparent text-center font-black text-sm outline-none"
+                    />
+                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-blue-600"><Plus size={16} /></button>
+                  </div>
+                )}
                 <button onClick={() => removeFromCart(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
               </div>
             ))
@@ -568,13 +620,50 @@ const POS: React.FC = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-slate-900 dark:text-white truncate text-sm">{item.name}</p>
+                    <p className="text-slate-400 text-xs font-semibold">
+                      {item.unit === 'KILO' 
+                        ? `${Math.round(item.quantity * 1000)}g x $${item.price.toLocaleString()}/Kg` 
+                        : item.unit === 'LITRO' 
+                          ? `${Math.round(item.quantity * 1000)}cc x $${item.price.toLocaleString()}/L` 
+                          : `${item.quantity} Ud x $${item.price.toLocaleString()}/Ud`
+                      }
+                    </p>
                     <p className="text-blue-600 font-black text-sm">${(item.price * item.quantity).toLocaleString()}</p>
                   </div>
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
-                    <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-blue-600"><Minus size={16} /></button>
-                    <span className="w-6 text-center font-black text-sm">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-blue-600"><Plus size={16} /></button>
-                  </div>
+                  {item.unit === 'KILO' || item.unit === 'LITRO' ? (
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <input 
+                        type="number"
+                        min="1"
+                        step="10"
+                        value={Math.round(item.quantity * 1000)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          updateQuantityDirect(item.id, val / 1000);
+                        }}
+                        className="w-16 bg-transparent text-right font-black text-sm outline-none border-b border-dashed border-slate-300 focus:border-blue-500"
+                      />
+                      <span className="text-[10px] font-bold text-slate-400 pr-1">
+                        {item.unit === 'KILO' ? 'g' : 'cc'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-blue-600"><Minus size={16} /></button>
+                      <input 
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10) || 1;
+                          updateQuantityDirect(item.id, Math.max(1, val));
+                        }}
+                        className="w-8 bg-transparent text-center font-black text-sm outline-none"
+                      />
+                      <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-slate-400 hover:text-blue-600"><Plus size={16} /></button>
+                    </div>
+                  )}
                   <button onClick={() => removeFromCart(item.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={18} /></button>
                 </div>
               ))}
