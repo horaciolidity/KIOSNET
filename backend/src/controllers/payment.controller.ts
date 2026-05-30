@@ -134,8 +134,8 @@ export const createMpSubscriptionPreference = async (req: any, res: Response) =>
     let price = plan === 'PRO' ? 15730 : 12320;
     configPrices.forEach(cfg => {
       const val = Number(cfg.value);
-      if (cfg.key === 'price_pro' && !isNaN(val)) price = val;
-      if (cfg.key === 'price_standard' && !isNaN(val)) price = val;
+      if (plan === 'PRO' && cfg.key === 'price_pro' && !isNaN(val)) price = val;
+      if (plan === 'STANDARD' && cfg.key === 'price_standard' && !isNaN(val)) price = val;
     });
 
     const finalPrice = price * numMonths;
@@ -217,8 +217,9 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
     const configPrices = await prisma.systemConfig.findMany();
     let price = plan === 'PRO' ? 15730 : 12320;
     configPrices.forEach(cfg => {
-      if (plan === 'PRO' && cfg.key === 'price_pro') price = Number(cfg.value) || 15730;
-      if (plan === 'STANDARD' && cfg.key === 'price_standard') price = Number(cfg.value) || 12320;
+      const val = Number(cfg.value);
+      if (plan === 'PRO' && cfg.key === 'price_pro' && !isNaN(val)) price = val;
+      if (plan === 'STANDARD' && cfg.key === 'price_standard' && !isNaN(val)) price = val;
     });
 
     const finalPrice = price * numMonths;
@@ -254,7 +255,6 @@ export const createMpSubscriptionQrOrder = async (req: any, res: Response) => {
       external_reference: `sub_${plan}_${tenantId}_${numMonths}`
     };
 
-    preferenceBody.auto_return = 'approved';
 
     const response = await preference.create({
       body: preferenceBody

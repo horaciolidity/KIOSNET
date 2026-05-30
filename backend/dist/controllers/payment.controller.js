@@ -9,6 +9,9 @@ const prisma_1 = __importDefault(require("../utils/prisma"));
 // Initialize Mercado Pago Client
 const getMpClient = () => {
     const token = process.env.MP_ACCESS_TOKEN || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
+    if (!process.env.MP_ACCESS_TOKEN) {
+        console.warn('Warning: MP_ACCESS_TOKEN is not configured. Using fallback Mercado Pago token. Set MP_ACCESS_TOKEN in production.');
+    }
     return new mercadopago_1.MercadoPagoConfig({
         accessToken: token,
         options: { timeout: 5000 }
@@ -72,9 +75,13 @@ const createMpPreference = async (req, res) => {
         const response = await preference.create({
             body: preferenceBody
         });
+        const initPoint = response.init_point || response.sandbox_init_point;
+        if (!initPoint) {
+            throw new Error('Mercado Pago no devolvió init_point para la preferencia.');
+        }
         res.json({
             preferenceId: response.id,
-            initPoint: response.init_point,
+            initPoint,
             saleId: pendingSale.id
         });
     }
@@ -106,9 +113,9 @@ const createMpSubscriptionPreference = async (req, res) => {
         let price = plan === 'PRO' ? 15730 : 12320;
         configPrices.forEach(cfg => {
             const val = Number(cfg.value);
-            if (cfg.key === 'price_pro' && !isNaN(val))
+            if (plan === 'PRO' && cfg.key === 'price_pro' && !isNaN(val))
                 price = val;
-            if (cfg.key === 'price_standard' && !isNaN(val))
+            if (plan === 'STANDARD' && cfg.key === 'price_standard' && !isNaN(val))
                 price = val;
         });
         const finalPrice = price * numMonths;
@@ -143,9 +150,13 @@ const createMpSubscriptionPreference = async (req, res) => {
         const response = await preference.create({
             body: preferenceBody
         });
+        const initPoint = response.init_point || response.sandbox_init_point;
+        if (!initPoint) {
+            throw new Error('Mercado Pago no devolvió init_point para la preferencia de suscripción.');
+        }
         res.json({
             preferenceId: response.id,
-            initPoint: response.init_point
+            initPoint
         });
     }
     catch (error) {
@@ -175,10 +186,11 @@ const createMpSubscriptionQrOrder = async (req, res) => {
         const configPrices = await prisma_1.default.systemConfig.findMany();
         let price = plan === 'PRO' ? 15730 : 12320;
         configPrices.forEach(cfg => {
-            if (plan === 'PRO' && cfg.key === 'price_pro')
-                price = Number(cfg.value) || 15730;
-            if (plan === 'STANDARD' && cfg.key === 'price_standard')
-                price = Number(cfg.value) || 12320;
+            const val = Number(cfg.value);
+            if (plan === 'PRO' && cfg.key === 'price_pro' && !isNaN(val))
+                price = val;
+            if (plan === 'STANDARD' && cfg.key === 'price_standard' && !isNaN(val))
+                price = val;
         });
         const finalPrice = price * numMonths;
         const title = plan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
@@ -208,23 +220,27 @@ const createMpSubscriptionQrOrder = async (req, res) => {
             notification_url: notificationUrl,
             external_reference: `sub_${plan}_${tenantId}_${numMonths}`
         };
-        preferenceBody.auto_return = 'approved';
         const response = await preference.create({
             body: preferenceBody
         });
-        const initPoint = response.init_point;
-        const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint || '')}`;
+        const initPoint = response.init_point || response.sandbox_init_point;
+        if (!initPoint) {
+            throw new Error('Mercado Pago no devolvió init_point para la preferencia de QR de suscripción.');
+        }
+        const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(initPoint)}`;
         res.json({
             success: true,
-            qrImage: qrImage,
+            qrImage,
             qrCode: initPoint
         });
     }
     catch (error) {
         console.error('Error creating subscription QR order preference:', error);
+        const details = error.response?.data || error.cause || null;
         res.status(500).json({
             message: 'Error al iniciar pago QR con Mercado Pago',
-            error: error.message
+            error: error.message,
+            details
         });
     }
 };
