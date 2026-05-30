@@ -24,6 +24,8 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useCashStore } from '../store/useCashStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { supabase } from '../utils/supabaseClient';
+import axios from 'axios';
 
 interface CartItem extends Product {
   quantity: number;
