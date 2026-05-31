@@ -55,31 +55,6 @@ async function getOrCreateCategoryId(categoryName: string, tenantId: string): Pr
     throw e; // Propagate error to caller
   }
 }
-  try {
-    const { data: categories, error: getError } = await supabase
-      .from('Category')
-      .select('id, name')
-      .eq('tenantId', tenantId);
-
-    if (getError) throw getError;
-
-    const found = categories?.find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
-    if (found) return found.id;
-
-    // Create category if it doesn't exist
-    const { data: newCat, error: createError } = await supabase
-      .from('Category')
-      .insert({ id: crypto.randomUUID(), name: categoryName, tenantId })
-      .select('id')
-      .single();
-
-    if (createError) throw createError;
-    return newCat.id;
-  } catch (e) {
-    console.error('Error resolving category in Supabase:', e);
-    return 'Otros';
-  }
-}
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   products: [],
