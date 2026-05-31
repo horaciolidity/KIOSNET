@@ -103,43 +103,66 @@ const Login: React.FC = () => {
       const sessionUser = authData?.user;
       if (!sessionUser) throw new Error('No se pudo registrar la cuenta');
 
-      // 2. Provision Tenant, User, Default Categories, Default Settings
-      const tenantId = crypto.randomUUID();
-      
-      const { error: tenantErr } = await supabase.from('Tenant').insert({
-        id: tenantId,
-        name: storeName,
-        plan: 'FREE',
-        subActive: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      if (tenantErr) throw tenantErr;
+      // 2. Check if a database trigger already created the User and Tenant
+      const { data: existingUser } = await supabase
+        .from('User')
+        .select('tenantId')
+        .eq('id', sessionUser.id)
+        .maybeSingle();
 
-      const { error: userErr } = await supabase.from('User').upsert({
-        id: sessionUser.id,
-        email: cleanEmail,
-        name,
-        role: 'ADMIN',
-        active: true,
-        tenantId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      if (userErr) throw userErr;
+      let currentTenantId = existingUser?.tenantId;
+
+      if (existingUser && currentTenantId) {
+        // Trigger already created them. Just update the existing Tenant and User.
+        await supabase.from('Tenant').update({
+          name: storeName,
+          updatedAt: new Date().toISOString()
+        }).eq('id', currentTenantId);
+
+        await supabase.from('User').update({
+          name,
+          role: 'ADMIN',
+          updatedAt: new Date().toISOString()
+        }).eq('id', sessionUser.id);
+      } else {
+        // No trigger. Create Tenant and User manually.
+        currentTenantId = crypto.randomUUID();
+        
+        const { error: tenantErr } = await supabase.from('Tenant').insert({
+          id: currentTenantId,
+          name: storeName,
+          plan: 'FREE',
+          subActive: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        if (tenantErr) throw tenantErr;
+
+        const { error: userErr } = await supabase.from('User').insert({
+          id: sessionUser.id,
+          email: cleanEmail,
+          name,
+          role: 'ADMIN',
+          active: true,
+          tenantId: currentTenantId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        if (userErr) throw userErr;
+      }
 
       await supabase.from('Category').insert([
-        { name: 'General', tenantId },
-        { name: 'Bebidas', tenantId },
-        { name: 'Comestibles', tenantId }
+        { name: 'General', tenantId: currentTenantId },
+        { name: 'Bebidas', tenantId: currentTenantId },
+        { name: 'Comestibles', tenantId: currentTenantId }
       ]);
 
       await supabase.from('Setting').insert([
-        { key: 'business_name', value: storeName, tenantId },
-        { key: 'business_phone', value: '', tenantId },
-        { key: 'business_address', value: '', tenantId },
-        { key: 'business_tax_id', value: '', tenantId },
-        { key: 'mercado_pago_active', value: 'false', tenantId }
+        { key: 'business_name', value: storeName, tenantId: currentTenantId },
+        { key: 'business_phone', value: '', tenantId: currentTenantId },
+        { key: 'business_address', value: '', tenantId: currentTenantId },
+        { key: 'business_tax_id', value: '', tenantId: currentTenantId },
+        { key: 'mercado_pago_active', value: 'false', tenantId: currentTenantId }
       ]);
 
       setSuccess('¡Comercio registrado con éxito! Iniciando sesión...');
@@ -153,7 +176,7 @@ const Login: React.FC = () => {
         email: cleanEmail,
         name,
         role: 'ADMIN' as const,
-        tenantId,
+        tenantId: currentTenantId,
         plan: 'FREE',
         subActive: false,
         subExpiresAt: null,
