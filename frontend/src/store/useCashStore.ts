@@ -157,6 +157,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       const { data: openMovement, error: movError } = await supabase
         .from('CashMovement')
         .insert({
+          id: crypto.randomUUID(),
           registerId: reg.id,
           amount,
           type: 'IN',
@@ -218,6 +219,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       const { data: closeMovement, error: movError } = await supabase
         .from('CashMovement')
         .insert({
+          id: crypto.randomUUID(),
           registerId: session.id,
           amount,
           type: 'OUT',
@@ -298,6 +300,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       const { data: savedMovement, error: movError } = await supabase
         .from('CashMovement')
         .insert({
+          id: crypto.randomUUID(),
           registerId: session.id,
           amount: tx.amount,
           type: mapFrontendTypeToDb(tx.type, tx.amount),
