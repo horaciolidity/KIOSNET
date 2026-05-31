@@ -31,63 +31,7 @@ const Login: React.FC = () => {
       let isAutoRegistered = false;
 
       if (authError) {
-        // Handle auto-registration client-side if it matches the previous backend behavior
-        if (authError.message.includes('Invalid login credentials') || authError.message.includes('should be registered')) {
-          try {
-            const signUpRes = await supabase.auth.signUp({ email: cleanEmail, password });
-            if (signUpRes.error) throw signUpRes.error;
-            sessionUser = signUpRes.data.user;
-            
-            if (sessionUser) {
-              isAutoRegistered = true;
-              const tenantId = crypto.randomUUID();
-              const autoStoreName = `Comercio de ${cleanEmail.split('@')[0]}`;
-              
-              await supabase.from('Tenant').insert({
-                id: tenantId,
-                name: autoStoreName,
-                plan: 'FREE',
-                subActive: false,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              });
-
-              await supabase.from('User').upsert({
-                id: sessionUser.id,
-                email: cleanEmail,
-                name: cleanEmail.split('@')[0],
-                role: 'ADMIN',
-                active: true,
-                tenantId,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              });
-
-              await supabase.from('Category').insert([
-                { name: 'General', tenantId },
-                { name: 'Bebidas', tenantId },
-                { name: 'Comestibles', tenantId }
-              ]);
-
-              await supabase.from('Setting').insert([
-                { key: 'business_name', value: autoStoreName, tenantId },
-                { key: 'business_phone', value: '', tenantId },
-                { key: 'business_address', value: '', tenantId },
-                { key: 'business_tax_id', value: '', tenantId },
-                { key: 'mercado_pago_active', value: 'false', tenantId }
-              ]);
-
-              // Login again to establish session
-              const reLogin = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-              data = reLogin.data;
-              sessionUser = reLogin.data.user;
-            }
-          } catch (regErr: any) {
-            throw new Error('Credenciales incorrectas o error de conexión');
-          }
-        } else {
-          throw authError;
-        }
+        throw authError;
       }
 
       if (!sessionUser) throw new Error('No se pudo iniciar sesión');
