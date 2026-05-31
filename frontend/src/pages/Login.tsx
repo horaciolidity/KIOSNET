@@ -378,10 +378,8 @@ const Login: React.FC = () => {
           </form>
         )}
 
-        <div className="mt-8 text-center text-slate-400 text-xs border-t border-white/5 pt-6 space-y-2">
-          <p>Demo Admin: <span className="text-white font-bold">admin@pos.com</span> / <span className="text-white font-bold">admin123</span></p>
-          <p>Demo Empleado: <span className="text-white font-bold">empleado@pos.com</span> / <span className="text-white font-bold">empleado123</span></p>
-          <p className="pt-4 text-slate-600">© 2026 KIOSNET. Todos los derechos reservados.</p>
+        <div className="mt-8 text-center text-slate-400 text-xs border-t border-white/5 pt-6">
+          <p className="text-slate-600">© 2026 KIOSNET. Todos los derechos reservados.</p>
         </div>
       </div>
     </div>

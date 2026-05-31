@@ -334,22 +334,22 @@ const Inventory: React.FC = () => {
 
       {/* Modal / Side Panel for Add/Edit */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[40px] shadow-2xl border border-white/10 overflow-hidden">
-            <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[32px] shadow-2xl border border-white/10 flex flex-col max-h-[92vh]">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30 flex-shrink-0 rounded-t-[32px]">
+              <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                 <div className="p-2 bg-blue-600 rounded-xl text-white">
-                  <Package size={24} />
+                  <Package size={20} />
                 </div>
                 {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
-                <X size={24} className="text-slate-400" />
+                <X size={22} className="text-slate-400" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormGroup label="Nombre del Producto" colSpan="md:col-span-2">
                   <input 
                     type="text" 
@@ -446,19 +446,19 @@ const Inventory: React.FC = () => {
                 </FormGroup>
               </div>
 
-              <div className="pt-8 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-4">
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
                 <button 
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-8 py-3 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                  className="px-6 py-2.5 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95"
+                  className="px-8 py-2.5 bg-blue-600 text-white rounded-2xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95"
                 >
-                  <Save size={20} /> {editingProduct ? 'Actualizar' : 'Guardar Producto'}
+                  <Save size={18} /> {editingProduct ? 'Actualizar' : 'Guardar Producto'}
                 </button>
               </div>
             </form>
