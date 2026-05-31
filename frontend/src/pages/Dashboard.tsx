@@ -153,22 +153,8 @@ const Dashboard: React.FC = () => {
         <StatCard title="Clientes" value="0" icon={<Users className="w-6 h-6 text-indigo-600" />} color="indigo" />
       </div>
 
-      {/* Premium Pro Interactive Showcase (Upsell) */}
-      {activePlan !== 'PRO' ? (
-        <ProShowcase upgradePlan={() => handleSelectPlan('PRO')} />
-      ) : (
-        <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-8 rounded-[40px] flex items-center gap-6 shadow-sm">
-          <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
-            <Crown size={32} />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400">¡Felicidades! Eres Usuario PRO</h3>
-            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">
-              Tienes habilitado el Modo Empleado Configurable, la Pantalla Display de Cliente interactiva en tiempo real y la Gestión Avanzada de Clientes con Crédito.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Hardware Tips Banner */}
+      <HardwareTips />
 
       {/* Plans Section */}
       <div className="space-y-6">
@@ -301,181 +287,117 @@ const PlanCard = ({ title, price, featured, features, active, onSelect }: any) =
   </div>
 );
 
-const ProShowcase = ({ upgradePlan }: any) => {
-  const [activeTab, setActiveTab] = React.useState<'display' | 'employees'>('display');
-  // State for display mock
-  const [mockCart, setMockCart] = React.useState<any[]>([
-    { name: 'Coca Cola 1.5L', price: 1200, qty: 1 }
-  ]);
-  const [mockEmployeeRole, setMockEmployeeRole] = React.useState<'ADMIN' | 'EMPLOYEE'>('ADMIN');
+const HardwareTips = () => (
+  <div className="relative overflow-hidden rounded-[40px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+    {/* Top accent bar */}
+    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
-  const addMockItem = () => {
-    if (mockCart.length < 3) {
-      setMockCart([...mockCart, { name: 'Pringles Original', price: 2300, qty: 1 }]);
-    } else {
-      setMockCart([{ name: 'Coca Cola 1.5L', price: 1200, qty: 1 }]);
-    }
-  };
-
-  const mockTotal = mockCart.reduce((sum, item) => sum + item.price * item.qty, 0);
-
-  return (
-    <div className="bg-slate-900 text-white rounded-[40px] p-8 border border-slate-800 shadow-2xl relative overflow-hidden space-y-6 animate-in zoom-in-95 duration-500">
-      {/* Decorative gradients */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="p-8 md:p-10 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="bg-indigo-500/20 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-indigo-500/30">
-            Mini Demo Interactiva
+          <span className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-500/20 mb-3">
+            <Zap size={12} /> Aprovechá al Máximo KIOSNET
           </span>
-          <h2 className="text-3xl font-black tracking-tight mt-3 text-white">Prueba las Funciones Pro en Vivo</h2>
-          <p className="text-slate-400 font-bold text-sm mt-1">Experimenta en tiempo real las herramientas exclusivas que impulsarán tu comercio.</p>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white leading-tight">
+            Equipá tu caja y vendé como un profesional
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-2 max-w-xl">
+            Con un lector de código de barras y una ticketera térmica de 80mm, KIOSNET funciona a plena velocidad — exactamente como los sistemas de grandes cadenas de comercio.
+          </p>
         </div>
-        <button 
-          onClick={upgradePlan}
-          className="bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-black text-sm hover:from-indigo-600 hover:to-blue-600 shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-95 transition-all whitespace-nowrap self-start md:self-center"
-        >
-          🚀 ¡UPGRADE A PRO AHORA!
-        </button>
+        <div className="hidden md:flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl shadow-xl shadow-blue-500/25 flex-shrink-0">
+          <ScanBarcode size={36} className="text-white" />
+        </div>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-800 pb-3">
-        <button 
-          onClick={() => setActiveTab('display')}
-          className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${activeTab === 'display' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-        >
-          🖥️ Pantalla Display Cliente
-        </button>
-        <button 
-          onClick={() => setActiveTab('employees')}
-          className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${activeTab === 'employees' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-        >
-          👥 Modo Empleado Inteligente
-        </button>
+      {/* Two Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Barcode Scanner Card */}
+        <div className="group relative rounded-3xl border border-blue-100 dark:border-blue-500/20 bg-blue-50/50 dark:bg-blue-500/5 p-6 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 flex-shrink-0">
+              <ScanBarcode size={26} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Lector de Código de Barras</h3>
+              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5">USB / Bluetooth</p>
+            </div>
+          </div>
+          <ul className="mt-5 space-y-3">
+            {[
+              'Añadí productos al carrito al instante — sin tipear nada',
+              'Buscá en tu inventario con un simple escaneo',
+              'Eliminá errores de carga y acelerá cada venta',
+              'Compatible con cualquier lector HID estándar'
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium">
+                <CheckCircle2 size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                {tip}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-4 border-t border-blue-100 dark:border-blue-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Velocidad de carga</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex-1 h-2 bg-blue-100 dark:bg-blue-500/20 rounded-full overflow-hidden">
+                <div className="h-full w-[96%] bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
+              </div>
+              <span className="text-xs font-black text-blue-600">×10 más rápido</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Thermal Printer Card */}
+        <div className="group relative rounded-3xl border border-violet-100 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-500/5 p-6 hover:shadow-xl hover:shadow-violet-500/10 transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 bg-violet-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20 flex-shrink-0">
+              <Printer size={26} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Ticketera Térmica 80mm</h3>
+              <p className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest mt-0.5">USB / Serie</p>
+            </div>
+          </div>
+          <ul className="mt-5 space-y-3">
+            {[
+              'Imprimí tickets profesionales desde el POS con un clic',
+              'Formato 80mm optimizado — logo, CUIT, ítems y vuelto',
+              'Compatible con impresoras ESC/POS estándar del mercado',
+              'Tus clientes se van con comprobante: más confianza y orden'
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium">
+                <CheckCircle2 size={16} className="text-violet-500 flex-shrink-0 mt-0.5" />
+                {tip}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-4 border-t border-violet-100 dark:border-violet-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Experiencia del cliente</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex-1 h-2 bg-violet-100 dark:bg-violet-500/20 rounded-full overflow-hidden">
+                <div className="h-full w-[92%] bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
+              </div>
+              <span className="text-xs font-black text-violet-600">Nivel Pro</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {activeTab === 'display' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* Mock POS interface */}
-          <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 flex flex-col justify-between space-y-6">
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <p className="text-xs font-black uppercase text-slate-500 tracking-wider">Tu Computadora (POS Cajero)</p>
-                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
-              </div>
-              <div className="space-y-2">
-                {mockCart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm font-bold border-b border-slate-900 pb-2">
-                    <span className="text-slate-400">{item.qty}x {item.name}</span>
-                    <span className="text-white">${item.price.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-between items-center pt-2">
-              <button 
-                onClick={addMockItem} 
-                className="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-black py-3 px-4 rounded-xl text-blue-400 transition-colors"
-              >
-                {mockCart.length < 3 ? '+ Escanear Producto' : '🔄 Reiniciar Carrito'}
-              </button>
-              <div className="text-right">
-                <p className="text-[10px] uppercase font-black text-slate-500">Total Cajero</p>
-                <p className="text-2xl font-black text-blue-500">${mockTotal.toLocaleString()}</p>
-              </div>
-            </div>
+      {/* Bottom Tip */}
+      <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl px-6 py-4 border border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center">
+            <Zap size={16} className="text-white" />
           </div>
-
-          {/* Mock Customer Display */}
-          <div className="bg-blue-600 text-white p-6 rounded-3xl border border-blue-500 flex flex-col justify-between shadow-2xl relative overflow-hidden transition-all duration-300">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl pointer-events-none"></div>
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-blue-200">Pantalla para tu Cliente (Segunda Pantalla)</p>
-              <div className="mt-4 space-y-2">
-                {mockCart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-xs font-bold border-b border-blue-500/30 pb-1">
-                    <span>{item.qty}x {item.name}</span>
-                    <span>${item.price.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-between items-end mt-4 pt-2">
-              <div>
-                <p className="text-[9px] uppercase font-bold text-blue-200">Total a pagar</p>
-                <p className="text-3xl font-black leading-none">${mockTotal.toLocaleString()}</p>
-              </div>
-              <div className="bg-white p-2 rounded-lg text-slate-900 flex flex-col items-center shadow-md">
-                <QrCode size={40} className="text-slate-900" />
-                <span className="text-[6px] font-black mt-1 uppercase text-[#009EE3]">Pagar con MP</span>
-              </div>
-            </div>
-          </div>
+          <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Consejo Pro</span>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {/* Role selector */}
-          <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 flex flex-col justify-between space-y-4">
-            <div>
-              <p className="text-xs font-black uppercase text-slate-500 tracking-wider mb-4">Simula el Rol de Usuario</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setMockEmployeeRole('ADMIN')}
-                  className={`py-3 rounded-xl font-black text-xs border transition-all ${mockEmployeeRole === 'ADMIN' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                >
-                  👑 Administrador / Dueño
-                </button>
-                <button 
-                  onClick={() => setMockEmployeeRole('EMPLOYEE')}
-                  className={`py-3 rounded-xl font-black text-xs border transition-all ${mockEmployeeRole === 'EMPLOYEE' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
-                >
-                  💼 Empleado / Cajero
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 mt-4 leading-relaxed font-bold">
-                {mockEmployeeRole === 'ADMIN' 
-                  ? 'Como Administrador tienes acceso completo para ver las ganancias netas de tu comercio, editar los precios de los productos y ver estadísticas históricas avanzadas.'
-                  : 'Como Empleado tu única prioridad es atender al cliente. El sistema automáticamente restringe las ganancias y la edición de inventario para máxima seguridad.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Interactive Interface Simulation */}
-          <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
-            {mockEmployeeRole === 'EMPLOYEE' && (
-              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-4">
-                <Lock size={32} className="text-red-500 mb-2 animate-bounce" />
-                <p className="font-black text-sm uppercase tracking-wider text-red-500">Acceso Restringido</p>
-                <p className="text-xs text-slate-400 max-w-[200px] mt-2 font-bold">Las estadísticas de ganancia y edición de precios están ocultas para empleados.</p>
-              </div>
-            )}
-            
-            <div className="space-y-4">
-              <p className="text-xs font-black uppercase text-slate-500 tracking-wider">Preview de Reportes de Caja</p>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl">
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-black uppercase">Ventas Totales</p>
-                    <p className="text-lg font-black text-white">$158,900</p>
-                  </div>
-                  <span className="text-emerald-500 text-xs font-bold">+15% vs ayer</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-indigo-500/20">
-                  <div>
-                    <p className="text-[10px] text-indigo-400 font-black uppercase">Ganancia Neta Estimada</p>
-                    <p className="text-lg font-black text-indigo-400">$63,560</p>
-                  </div>
-                  <span className="text-indigo-400 text-xs font-bold">Margen: 40%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium text-center sm:text-left">
+          Conectá el lector al puerto USB y KIOSNET lo detecta automáticamente. No requiere ningún driver ni configuración extra.
+        </p>
+      </div>
     </div>
-  );
-};
+  </div>
+);
 
 export default Dashboard;
