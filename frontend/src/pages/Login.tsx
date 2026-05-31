@@ -52,7 +52,7 @@ const Login: React.FC = () => {
                 updatedAt: new Date().toISOString()
               });
 
-              await supabase.from('User').insert({
+              await supabase.from('User').upsert({
                 id: sessionUser.id,
                 email: cleanEmail,
                 name: cleanEmail.split('@')[0],
@@ -172,7 +172,7 @@ const Login: React.FC = () => {
       });
       if (tenantErr) throw tenantErr;
 
-      const { error: userErr } = await supabase.from('User').insert({
+      const { error: userErr } = await supabase.from('User').upsert({
         id: sessionUser.id,
         email: cleanEmail,
         name,
