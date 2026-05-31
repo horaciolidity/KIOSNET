@@ -212,8 +212,7 @@ const POS: React.FC = () => {
           productId: item.id,
           quantity: Number(item.quantity),
           price: Number(item.price),
-          costPrice: Number(item.costPrice),
-          updatedAt: new Date().toISOString()
+          costPrice: Number(item.costPrice)
         })));
 
       if (itemsErr) throw itemsErr;
@@ -385,8 +384,7 @@ const POS: React.FC = () => {
                   productId: item.id,
                   quantity: Number(item.quantity),
                   price: Number(item.price),
-                  costPrice: Number(item.costPrice),
-                  updatedAt: new Date().toISOString()
+                  costPrice: Number(item.costPrice)
                 })));
 
               // 6. Decrement physical stock
