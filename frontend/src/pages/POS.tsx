@@ -198,7 +198,8 @@ const POS: React.FC = () => {
           tenantId: user.tenantId,
           receivedAmount: Number(amountPaid) || total,
           changeAmount: change,
-          status: 'COMPLETED'
+          status: 'COMPLETED',
+          updatedAt: new Date().toISOString()
         });
 
       if (saleErr) throw saleErr;
@@ -211,7 +212,8 @@ const POS: React.FC = () => {
           productId: item.id,
           quantity: Number(item.quantity),
           price: Number(item.price),
-          costPrice: Number(item.costPrice)
+          costPrice: Number(item.costPrice),
+          updatedAt: new Date().toISOString()
         })));
 
       if (itemsErr) throw itemsErr;
@@ -322,7 +324,8 @@ const POS: React.FC = () => {
             tenantId: user.tenantId,
             receivedAmount: total,
             changeAmount: 0,
-            status: 'PENDING'
+            status: 'PENDING',
+            updatedAt: new Date().toISOString()
           });
 
         if (saleErr) throw saleErr;
@@ -382,7 +385,8 @@ const POS: React.FC = () => {
                   productId: item.id,
                   quantity: Number(item.quantity),
                   price: Number(item.price),
-                  costPrice: Number(item.costPrice)
+                  costPrice: Number(item.costPrice),
+                  updatedAt: new Date().toISOString()
                 })));
 
               // 6. Decrement physical stock
