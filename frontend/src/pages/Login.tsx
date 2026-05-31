@@ -46,7 +46,9 @@ const Login: React.FC = () => {
                 id: tenantId,
                 name: autoStoreName,
                 plan: 'FREE',
-                subActive: false
+                subActive: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
               });
 
               await supabase.from('User').insert({
@@ -55,7 +57,9 @@ const Login: React.FC = () => {
                 name: email.split('@')[0],
                 role: 'ADMIN',
                 active: true,
-                tenantId
+                tenantId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
               });
 
               await supabase.from('Category').insert([
@@ -160,7 +164,9 @@ const Login: React.FC = () => {
         id: tenantId,
         name: storeName,
         plan: 'FREE',
-        subActive: false
+        subActive: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       if (tenantErr) throw tenantErr;
 
@@ -170,7 +176,9 @@ const Login: React.FC = () => {
         name,
         role: 'ADMIN',
         active: true,
-        tenantId
+        tenantId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
       if (userErr) throw userErr;
 
