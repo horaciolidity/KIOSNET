@@ -208,6 +208,7 @@ const POS: React.FC = () => {
       const { error: itemsErr } = await supabase
         .from('SaleItem')
         .insert(cart.map(item => ({
+          id: crypto.randomUUID(),
           saleId: newSaleId,
           productId: item.id,
           quantity: Number(item.quantity),
@@ -380,6 +381,7 @@ const POS: React.FC = () => {
               await supabase
                 .from('SaleItem')
                 .insert(cart.map(item => ({
+                  id: crypto.randomUUID(),
                   saleId: pendingSaleId,
                   productId: item.id,
                   quantity: Number(item.quantity),
