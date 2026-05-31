@@ -36,7 +36,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isDarkMode, toggleDarkMode } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, token, setAuth } = useAuthStore();
+  const { user, logout, token, setAuth, fetchUserSession } = useAuthStore();
   const { businessInfo } = useSettingsStore();
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -66,6 +66,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Sync / Fetch user profile from Supabase on load to reflect subscription changes in real-time
+  useEffect(() => {
+    if (user) {
+      fetchUserSession();
+    }
+  }, [location.pathname]);
 
   // Activate subscription when Mercado Pago redirects back to app with ?sub=success
   useEffect(() => {
