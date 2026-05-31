@@ -141,6 +141,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         unit: productData.unit,
         tenantId,
         active: true,
+        updatedAt: new Date().toISOString(),
       };
 
       const { data: savedProduct, error: insertError } = await supabase
