@@ -68,15 +68,17 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      const { data: reg, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('CashRegister')
         .select('*, movements:CashMovement(*)')
         .eq('userId', user.id)
         .eq('status', 'OPEN')
         .eq('tenantId', user.tenantId)
-        .maybeSingle();
+        .order('openedAt', { ascending: false })
+        .limit(1);
 
       if (error) throw error;
+      const reg = rows?.[0] ?? null;
 
       if (reg) {
         // Map database cash register and its movements

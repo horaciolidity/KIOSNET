@@ -44,7 +44,32 @@ async function getOrCreateCategoryId(categoryName: string, tenantId: string): Pr
     // Create category if it doesn't exist
     const { data: newCat, error: createError } = await supabase
       .from('Category')
-      .insert({ name: categoryName, tenantId })
+      .insert({ id: crypto.randomUUID(), name: categoryName, tenantId })
+      .select('id')
+      .single();
+
+    if (createError) throw createError;
+    return newCat.id;
+  } catch (e) {
+    console.error('Error resolving category in Supabase:', e);
+    throw e; // Propagate error to caller
+  }
+}
+  try {
+    const { data: categories, error: getError } = await supabase
+      .from('Category')
+      .select('id, name')
+      .eq('tenantId', tenantId);
+
+    if (getError) throw getError;
+
+    const found = categories?.find((c: any) => c.name.toLowerCase() === categoryName.toLowerCase());
+    if (found) return found.id;
+
+    // Create category if it doesn't exist
+    const { data: newCat, error: createError } = await supabase
+      .from('Category')
+      .insert({ id: crypto.randomUUID(), name: categoryName, tenantId })
       .select('id')
       .single();
 
@@ -98,14 +123,30 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     const tenantId = useAuthStore.getState().user?.tenantId;
     if (!tenantId) return;
 
-    // 1. Optimistic Update
+    // 0. Validate barcode uniqueness before optimistic UI update
+    if (productData.barcode) {
+      const { data: existing } = await supabase
+        .from('Product')
+        .select('id')
+        .eq('barcode', productData.barcode)
+        .eq('tenantId', tenantId)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (existing) {
+        alert('Ya tienes un producto registrado con este código de barras');
+        return; // Abort add operation early
+      }
+    }
+
+    // 1. Optimistic Update – add temporary product to UI
     const tempId = 'temp-' + Math.random().toString(36).substr(2, 9);
     const newProductTemp: Product = {
       ...productData,
       id: tempId,
       createdAt: new Date().toISOString(),
     };
-    
+
     set((state) => ({
       products: [...state.products, newProductTemp],
     }));
@@ -113,26 +154,6 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     // 2. Persist to Supabase
     try {
       const categoryId = await getOrCreateCategoryId(productData.category, tenantId);
-
-      // Check barcode uniqueness
-      if (productData.barcode) {
-        const { data: existing } = await supabase
-          .from('Product')
-          .select('id')
-          .eq('barcode', productData.barcode)
-          .eq('tenantId', tenantId)
-          .eq('active', true)
-          .maybeSingle();
-
-        if (existing) {
-          alert('Ya tienes un producto registrado con este código de barras');
-          // Revert optimistic update
-          set((state) => ({
-            products: state.products.filter((p) => p.id !== tempId),
-          }));
-          return;
-        }
-      }
 
       const payload = {
         name: productData.name,
@@ -144,28 +165,26 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         minStock: Number(productData.minStock),
         unit: productData.unit,
         tenantId,
-        active: true
+        active: true,
       };
 
       const { data: savedProduct, error: insertError } = await supabase
         .from('Product')
-        .insert(payload)
+        .insert({ id: crypto.randomUUID(), ...payload })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // Swap the temp ID with the real DB ID
+      // Replace temporary product with the persisted version
       set((state) => ({
-        products: state.products.map((p) => p.id === tempId ? {
-          ...p,
-          id: savedProduct.id,
-          createdAt: savedProduct.createdAt,
-        } : p),
+        products: state.products.map((p) =>
+          p.id === tempId ? { ...p, ...savedProduct, createdAt: savedProduct.createdAt } : p
+        ),
       }));
     } catch (error) {
       console.error('Error persisting product to Supabase:', error);
-      // Revert if API call fails
+      // Revert optimistic addition on failure
       set((state) => ({
         products: state.products.filter((p) => p.id !== tempId),
       }));
