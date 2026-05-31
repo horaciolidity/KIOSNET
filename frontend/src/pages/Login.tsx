@@ -23,8 +23,9 @@ const Login: React.FC = () => {
     setSuccess('');
 
     try {
+      const cleanEmail = email.trim();
       // 1. Authenticate with Supabase Auth
-      let { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      let { data, error: authError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       
       let sessionUser = data?.user;
       let isAutoRegistered = false;
@@ -33,14 +34,14 @@ const Login: React.FC = () => {
         // Handle auto-registration client-side if it matches the previous backend behavior
         if (authError.message.includes('Invalid login credentials') || authError.message.includes('should be registered')) {
           try {
-            const signUpRes = await supabase.auth.signUp({ email, password });
+            const signUpRes = await supabase.auth.signUp({ email: cleanEmail, password });
             if (signUpRes.error) throw signUpRes.error;
             sessionUser = signUpRes.data.user;
             
             if (sessionUser) {
               isAutoRegistered = true;
               const tenantId = crypto.randomUUID();
-              const autoStoreName = `Comercio de ${email.split('@')[0]}`;
+              const autoStoreName = `Comercio de ${cleanEmail.split('@')[0]}`;
               
               await supabase.from('Tenant').insert({
                 id: tenantId,
@@ -53,8 +54,8 @@ const Login: React.FC = () => {
 
               await supabase.from('User').insert({
                 id: sessionUser.id,
-                email,
-                name: email.split('@')[0],
+                email: cleanEmail,
+                name: cleanEmail.split('@')[0],
                 role: 'ADMIN',
                 active: true,
                 tenantId,
@@ -77,7 +78,7 @@ const Login: React.FC = () => {
               ]);
 
               // Login again to establish session
-              const reLogin = await supabase.auth.signInWithPassword({ email, password });
+              const reLogin = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
               data = reLogin.data;
               sessionUser = reLogin.data.user;
             }
@@ -150,8 +151,9 @@ const Login: React.FC = () => {
     setSuccess('');
 
     try {
+      const cleanEmail = email.trim();
       // 1. Sign up to Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email: cleanEmail, password });
       if (authError) throw authError;
 
       const sessionUser = authData?.user;
@@ -172,7 +174,7 @@ const Login: React.FC = () => {
 
       const { error: userErr } = await supabase.from('User').insert({
         id: sessionUser.id,
-        email,
+        email: cleanEmail,
         name,
         role: 'ADMIN',
         active: true,
@@ -199,12 +201,12 @@ const Login: React.FC = () => {
       setSuccess('¡Comercio registrado con éxito! Iniciando sesión...');
 
       // 3. Complete login
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (loginError) throw loginError;
 
       const userObj = {
         id: sessionUser.id,
-        email,
+        email: cleanEmail,
         name,
         role: 'ADMIN' as const,
         tenantId,
