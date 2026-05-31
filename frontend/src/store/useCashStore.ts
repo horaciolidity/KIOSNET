@@ -142,6 +142,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       const { data: reg, error: regError } = await supabase
         .from('CashRegister')
         .insert({
+          id: crypto.randomUUID(),
           userId: user.id,
           tenantId: user.tenantId,
           openingBalance: amount,
