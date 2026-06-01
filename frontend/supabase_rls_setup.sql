@@ -21,6 +21,11 @@ ALTER TABLE "CashMovement" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "SystemConfig" ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================
+-- PASO 1.5: Agregar columnas e infraestructura necesarias
+-- =============================================================
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "paymentNotification" JSONB DEFAULT NULL;
+
+-- =============================================================
 -- PASO 2: Eliminar TODAS las políticas anteriores
 -- =============================================================
 DO $$ 
@@ -37,12 +42,22 @@ BEGIN
 END $$;
 
 -- =============================================================
--- PASO 3: Función auxiliar para verificar si es superadmin
+-- PASO 3: Funciones auxiliares para verificar roles y tenantId
 -- =============================================================
 CREATE OR REPLACE FUNCTION is_superadmin()
 RETURNS boolean AS $$
 BEGIN
   RETURN (auth.jwt() ->> 'email') = 'horaciowalterortiz@gmail.com';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_user_tenant_id()
+RETURNS text AS $$
+DECLARE
+  tid text;
+BEGIN
+  SELECT "tenantId"::text INTO tid FROM "User" WHERE id = auth.uid();
+  RETURN tid;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -65,14 +80,14 @@ CREATE POLICY "Tenant: select own"
   ON "Tenant" FOR SELECT
   TO authenticated
   USING (
-    id::text IN (SELECT "tenantId"::text FROM "User" WHERE id::text = auth.uid()::text)
+    id::text = get_user_tenant_id()
   );
 
 CREATE POLICY "Tenant: update own"
   ON "Tenant" FOR UPDATE
   TO authenticated
   USING (
-    id::text IN (SELECT "tenantId"::text FROM "User" WHERE id::text = auth.uid()::text)
+    id::text = get_user_tenant_id()
   );
 
 -- =============================================================
@@ -94,7 +109,9 @@ CREATE POLICY "User: select own tenant"
   ON "User" FOR SELECT
   TO authenticated
   USING (
-    "tenantId"::text IN (SELECT "tenantId"::text FROM "User" WHERE id::text = auth.uid()::text)
+    id::text = auth.uid()::text
+    OR
+    "tenantId"::text = get_user_tenant_id()
   );
 
 CREATE POLICY "User: update own"
