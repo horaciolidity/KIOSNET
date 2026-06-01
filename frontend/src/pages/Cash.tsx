@@ -86,10 +86,6 @@ const Cash: React.FC = () => {
   const totalCredit      = salesCredit  + txs.filter(t => t.type !== 'VENTA' && t.type !== 'EGRESO' && t.method === 'CREDITO').reduce((s, t) => s + t.amount, 0);
   const totalCC          = salesCC      + txs.filter(t => t.type !== 'VENTA' && t.type !== 'EGRESO' && t.method === 'CUENTA_CORRIENTE').reduce((s, t) => s + t.amount, 0);
 
-  // Grand total collected (all channels)
-  const totalCollected   = salesCash + salesTransfer + salesDebit + salesCredit + manualIncomes + debtPayments;
-  // Note: CC is not "collected" cash — it's a deferred payment
-
   const saleCount        = txs.filter(t => t.type === 'VENTA').length;
 
   const handleOpen = (e: React.FormEvent) => {
