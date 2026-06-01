@@ -648,13 +648,49 @@ const SubscriptionPay: React.FC = () => {
                     <div className="bg-slate-950 p-3 rounded-lg border border-white/5 flex justify-between items-center">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase">Alias</p>
-                        <p className="text-sm font-bold text-blue-400 font-mono">KIOSNET.PAGOS</p>
+                        <p className="text-sm font-bold text-blue-400 font-mono">horacio.asa</p>
                       </div>
-                      <button onClick={() => navigator.clipboard.writeText('KIOSNET.PAGOS')} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">Copiar</button>
+                      <button onClick={() => navigator.clipboard.writeText('horacio.asa')} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">Copiar</button>
                     </div>
                     <p className="text-xs text-slate-400 mt-2">
-                      Transfiere el monto exacto de <strong>${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS</strong> y envía el comprobante por WhatsApp.
+                      Transfiere el monto exacto de <strong>${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS</strong> y luego haz clic en el botón de abajo para notificar el pago.
                     </p>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          const tenantId = user?.tenantId;
+                          if (!tenantId) return;
+                          
+                          // Notificar creando/actualizando una columna o generando alerta directa.
+                          // Crearemos un registro o marcaremos un flag en el Tenant para que el superadmin lo vea de inmediato.
+                          // También mostramos una alerta visual interactiva al usuario.
+                          const { error: notifyErr } = await supabase
+                            .from('Tenant')
+                            .update({
+                              paymentNotification: {
+                                notifiedAt: new Date().toISOString(),
+                                plan: selectedPlan,
+                                months: selectedMonths,
+                                amount: (selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths,
+                                status: 'PENDING'
+                              }
+                            })
+                            .eq('id', tenantId);
+                            
+                          if (notifyErr) throw notifyErr;
+                          
+                          alert('¡Pago Notificado con Éxito! El administrador horacio.asa ha sido alertado y activará tu cuenta a la brevedad.');
+                        } catch (err: any) {
+                          console.error(err);
+                          alert('Error al notificar el pago: ' + (err.message || err));
+                        }
+                      }}
+                      className="w-full mt-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      Notificar Pago al Administrador
+                    </button>
                   </div>
                 </div>
 

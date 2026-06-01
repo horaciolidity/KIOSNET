@@ -39,6 +39,13 @@ interface Tenant {
   createdAt: string;
   salesCount: number;
   users: TenantUser[];
+  paymentNotification?: {
+    notifiedAt: string;
+    plan: 'STANDARD' | 'PRO';
+    months: number;
+    amount: number;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  } | null;
 }
 
 interface PricingConfig {
@@ -63,7 +70,7 @@ const SuperAdmin: React.FC = () => {
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('Tenant')
         .select(`
-          id, name, email, phone, address, plan, subActive, subExpiresAt, createdAt,
+          id, name, email, phone, address, plan, subActive, subExpiresAt, createdAt, paymentNotification,
           users:User(id, email, name, role, active, createdAt),
           sales:Sale(id)
         `)
@@ -98,7 +105,8 @@ const SuperAdmin: React.FC = () => {
         subExpiresAt: t.subExpiresAt,
         createdAt: t.createdAt,
         salesCount: t.sales?.length || 0,
-        users: t.users || []
+        users: t.users || [],
+        paymentNotification: t.paymentNotification
       }));
 
       setTenants(mappedTenants);
@@ -461,8 +469,86 @@ const SuperAdmin: React.FC = () => {
                   <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                     <td className="p-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-slate-900 dark:text-white text-sm">{t.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-slate-900 dark:text-white text-sm">{t.name}</span>
+                          {t.paymentNotification && t.paymentNotification.status === 'PENDING' && (
+                            <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-bounce">
+                              ¡NUEVO PAGO!
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[180px]">{t.id}</span>
+                        {t.paymentNotification && t.paymentNotification.status === 'PENDING' && (
+                          <div className="mt-2 bg-red-500/10 border border-red-500/20 p-2 rounded-xl text-left max-w-[220px]">
+                            <p className="text-[9px] font-black text-red-500 uppercase tracking-wider">Reportó Transferencia</p>
+                            <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">
+                              Plan: {t.paymentNotification.plan} ({t.paymentNotification.months}m)
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-900 dark:text-white">
+                              Total: ${t.paymentNotification.amount.toLocaleString()} ARS
+                            </p>
+                            <div className="flex gap-1.5 mt-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    // APROBAR PAGO
+                                    // Calcular expiración
+                                    let baseDate = new Date();
+                                    if (t.subActive && t.subExpiresAt && new Date(t.subExpiresAt) > new Date()) {
+                                      baseDate = new Date(t.subExpiresAt);
+                                    }
+                                    baseDate.setMonth(baseDate.getMonth() + t.paymentNotification!.months);
+                                    
+                                    const { error: appErr } = await supabase
+                                      .from('Tenant')
+                                      .update({
+                                        subActive: true,
+                                        plan: t.paymentNotification!.plan,
+                                        subExpiresAt: baseDate.toISOString(),
+                                        paymentNotification: {
+                                          ...t.paymentNotification,
+                                          status: 'APPROVED'
+                                        }
+                                      })
+                                      .eq('id', t.id);
+                                    if (appErr) throw appErr;
+                                    alert('¡Pago aprobado y comercio activado con éxito!');
+                                    fetchData();
+                                  } catch (err: any) {
+                                    alert('Error al aprobar: ' + err.message);
+                                  }
+                                }}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white text-[9px] font-black px-2 py-1 rounded-lg transition-all shrink-0"
+                              >
+                                Aprobar
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    // RECHAZAR PAGO
+                                    const { error: rejErr } = await supabase
+                                      .from('Tenant')
+                                      .update({
+                                        paymentNotification: {
+                                          ...t.paymentNotification,
+                                          status: 'REJECTED'
+                                        }
+                                      })
+                                      .eq('id', t.id);
+                                    if (rejErr) throw rejErr;
+                                    alert('Reporte de pago rechazado.');
+                                    fetchData();
+                                  } catch (err: any) {
+                                    alert('Error al rechazar: ' + err.message);
+                                  }
+                                }}
+                                className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] font-black px-2 py-1 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0"
+                              >
+                                Rechazar
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">
