@@ -29,6 +29,7 @@ interface CashState {
   history: CashTransaction[];
   loading: boolean;
   fetchActiveSession: () => Promise<void>;
+  fetchHistory: () => Promise<void>;
   openBox: (amount: number) => Promise<void>;
   closeBox: (amount: number) => Promise<void>;
   addTransaction: (transaction: Omit<CashTransaction, 'id' | 'timestamp'>) => Promise<void>;
@@ -131,6 +132,47 @@ export const useCashStore = create<CashState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error fetching active cash session from Supabase:', error);
+      set({ loading: false });
+    }
+  },
+
+  fetchHistory: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    set({ loading: true });
+    try {
+      // Fetch all movements related to registers belonging to this tenant
+      const { data: movements, error } = await supabase
+        .from('CashMovement')
+        .select(`
+          id,
+          amount,
+          type,
+          description,
+          createdAt,
+          register:CashRegister!inner(tenantId)
+        `)
+        .eq('CashRegister.tenantId', user.tenantId)
+        .order('createdAt', { ascending: false });
+
+      if (error) throw error;
+
+      const mappedTransactions: CashTransaction[] = (movements || []).map((m: any) => ({
+        id: m.id,
+        type: mapDbToFrontendType(m.type, m.description),
+        amount: m.amount,
+        method: 'EFECTIVO',
+        description: m.description,
+        timestamp: m.createdAt,
+      }));
+
+      set({
+        history: mappedTransactions,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Error fetching cash history from Supabase:', error);
       set({ loading: false });
     }
   },

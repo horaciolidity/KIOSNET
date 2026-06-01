@@ -16,10 +16,14 @@ import {
 import { useCashStore } from '../store/useCashStore';
 
 const History: React.FC = () => {
-  const { history } = useCashStore();
+  const { history, fetchHistory } = useCashStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'EGRESO' | 'SISTEMA'>('TODOS');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const filteredHistory = history.filter(item => {
     const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 

@@ -25,8 +25,12 @@ const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
   const { businessInfo } = useSettingsStore();
   const { products } = useInventoryStore();
-  const { history } = useCashStore();
+  const { history, fetchHistory } = useCashStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
 
