@@ -41,12 +41,54 @@ function mapFrontendTypeToDb(type: string, amount: number): 'IN' | 'OUT' {
   return amount >= 0 ? 'IN' : 'OUT';
 }
 
-function mapDbToFrontendType(type: 'IN' | 'OUT', description: string): 'INGRESO' | 'EGRESO' | 'VENTA' | 'SISTEMA' | 'PAGO_DEUDA' {
+function mapDbToFrontendType(type: 'IN' | 'OUT', description: string, paymentMethod?: string): {
+  txType: 'INGRESO' | 'EGRESO' | 'VENTA' | 'SISTEMA' | 'PAGO_DEUDA';
+  method: CashTransaction['method'];
+} {
   const desc = description.toLowerCase();
-  if (desc.includes('venta')) return 'VENTA';
-  if (desc.includes('deuda') || desc.includes('pago')) return 'PAGO_DEUDA';
-  if (desc.includes('apertura') || desc.includes('cierre')) return 'SISTEMA';
-  return type === 'IN' ? 'INGRESO' : 'EGRESO';
+
+  // Determine transaction type
+  let txType: CashTransaction['type'];
+  if (desc.includes('venta')) txType = 'VENTA';
+  else if (desc.includes('deuda') || desc.includes('pago')) txType = 'PAGO_DEUDA';
+  else if (desc.includes('apertura') || desc.includes('cierre')) txType = 'SISTEMA';
+  else txType = type === 'IN' ? 'INGRESO' : 'EGRESO';
+
+  // Determine payment method from stored paymentMethod field
+  let method: CashTransaction['method'] = 'EFECTIVO';
+  if (paymentMethod) {
+    const pm = paymentMethod.toUpperCase();
+    if (pm === 'DEBITO') method = 'DEBITO';
+    else if (pm === 'CREDITO') method = 'CREDITO';
+    else if (pm === 'TRANSFERENCIA') method = 'TRANSFERENCIA';
+    else if (pm === 'CUENTA_CORRIENTE') method = 'CUENTA_CORRIENTE';
+    else if (pm === 'NINGUNO') method = 'NINGUNO';
+    else method = 'EFECTIVO';
+  }
+
+  return { txType, method };
+}
+
+/**
+ * Calculate the physical cash balance in the register.
+ * Only EFECTIVO movements affect the cash drawer.
+ * Cuenta Corriente, Transferencias, Débito, Crédito are NOT physical cash.
+ */
+function calculateCashBalance(openingBalance: number, transactions: CashTransaction[]): number {
+  return transactions.reduce((acc, t) => {
+    // Skip apertura/sistema (already counted in openingBalance)
+    if (t.type === 'SISTEMA') return acc;
+    // Egresos always reduce cash (they're always physical cash out)
+    if (t.type === 'EGRESO') return acc - t.amount;
+    // Ingresos manuales in cash only
+    if (t.type === 'INGRESO' && t.method === 'EFECTIVO') return acc + t.amount;
+    // Sales: only cash sales affect the drawer
+    if (t.type === 'VENTA' && t.method === 'EFECTIVO') return acc + t.amount;
+    // PAGO_DEUDA: customer paying off their cuenta corriente in cash
+    if (t.type === 'PAGO_DEUDA' && t.method === 'EFECTIVO') return acc + t.amount;
+    // Non-cash payments (TRANSFERENCIA, DEBITO, CREDITO, CUENTA_CORRIENTE) don't go in the drawer
+    return acc;
+  }, openingBalance);
 }
 
 export const useCashStore = create<CashState>((set, get) => ({
@@ -82,24 +124,25 @@ export const useCashStore = create<CashState>((set, get) => ({
       const reg = rows?.[0] ?? null;
 
       if (reg) {
-        // Map database cash register and its movements
-        const mappedTransactions: CashTransaction[] = (reg.movements || []).map((m: any) => ({
-          id: m.id,
-          type: mapDbToFrontendType(m.type, m.description),
-          amount: m.amount,
-          method: 'EFECTIVO',
-          description: m.description,
-          timestamp: m.createdAt,
-        }));
+        // Map database cash register and its movements — preserve paymentMethod
+        const mappedTransactions: CashTransaction[] = (reg.movements || []).map((m: any) => {
+          const { txType, method } = mapDbToFrontendType(m.type, m.description, m.paymentMethod);
+          return {
+            id: m.id,
+            type: txType,
+            amount: m.amount,
+            method,
+            profit: m.profit ?? undefined,
+            description: m.description,
+            timestamp: m.createdAt,
+          };
+        });
 
         // Sort descending by timestamp
         mappedTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        const currentBalance = mappedTransactions.reduce((acc, t) => {
-          if (t.type === 'EGRESO') return acc - t.amount;
-          if (t.description === 'Apertura de Caja') return acc;
-          return acc + t.amount;
-        }, reg.openingBalance);
+        // currentBalance = only the PHYSICAL CASH in the drawer
+        const currentBalance = calculateCashBalance(reg.openingBalance, mappedTransactions);
 
         set({
           session: {
@@ -142,13 +185,14 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      // Fetch all movements related to registers belonging to this tenant
       const { data: movements, error } = await supabase
         .from('CashMovement')
         .select(`
           id,
           amount,
           type,
+          paymentMethod,
+          profit,
           description,
           createdAt,
           register:CashRegister!inner(tenantId)
@@ -158,14 +202,18 @@ export const useCashStore = create<CashState>((set, get) => ({
 
       if (error) throw error;
 
-      const mappedTransactions: CashTransaction[] = (movements || []).map((m: any) => ({
-        id: m.id,
-        type: mapDbToFrontendType(m.type, m.description),
-        amount: m.amount,
-        method: 'EFECTIVO',
-        description: m.description,
-        timestamp: m.createdAt,
-      }));
+      const mappedTransactions: CashTransaction[] = (movements || []).map((m: any) => {
+        const { txType, method } = mapDbToFrontendType(m.type, m.description, m.paymentMethod);
+        return {
+          id: m.id,
+          type: txType,
+          amount: m.amount,
+          method,
+          profit: m.profit ?? undefined,
+          description: m.description,
+          timestamp: m.createdAt,
+        };
+      });
 
       set({
         history: mappedTransactions,
@@ -203,8 +251,10 @@ export const useCashStore = create<CashState>((set, get) => ({
         .insert({
           id: crypto.randomUUID(),
           registerId: reg.id,
+          tenantId: user.tenantId,
           amount,
           type: 'IN',
+          paymentMethod: 'EFECTIVO',
           description: 'Apertura de Caja'
         })
         .select()
@@ -246,6 +296,7 @@ export const useCashStore = create<CashState>((set, get) => ({
     const session = get().session;
     if (!session.isOpen || session.id === '1') return;
 
+    const user = useAuthStore.getState().user;
     set({ loading: true });
     try {
       const { error: regError } = await supabase
@@ -265,8 +316,10 @@ export const useCashStore = create<CashState>((set, get) => ({
         .insert({
           id: crypto.randomUUID(),
           registerId: session.id,
+          tenantId: user?.tenantId,
           amount,
           type: 'OUT',
+          paymentMethod: 'EFECTIVO',
           description: 'Cierre de Caja'
         })
         .select()
@@ -302,6 +355,8 @@ export const useCashStore = create<CashState>((set, get) => ({
 
   addTransaction: async (tx) => {
     const session = get().session;
+    const user = useAuthStore.getState().user;
+
     if (!session.isOpen || session.id === '1') {
       // Local fallback if no session is open
       const tempTx: CashTransaction = {
@@ -323,6 +378,7 @@ export const useCashStore = create<CashState>((set, get) => ({
       timestamp: new Date().toISOString()
     };
 
+    // Only EFECTIVO payments change the physical balance
     let newBalance = session.currentBalance;
     if (tx.method === 'EFECTIVO') {
       newBalance = tx.type === 'EGRESO'
@@ -339,15 +395,18 @@ export const useCashStore = create<CashState>((set, get) => ({
       history: [tempTx, ...state.history]
     }));
 
-    // 2. Persist to Supabase
+    // 2. Persist to Supabase — store paymentMethod and profit
     try {
       const { data: savedMovement, error: movError } = await supabase
         .from('CashMovement')
         .insert({
           id: crypto.randomUUID(),
           registerId: session.id,
+          tenantId: user?.tenantId,
           amount: tx.amount,
           type: mapFrontendTypeToDb(tx.type, tx.amount),
+          paymentMethod: tx.method,
+          profit: tx.profit ?? null,
           description: tx.description
         })
         .select()
