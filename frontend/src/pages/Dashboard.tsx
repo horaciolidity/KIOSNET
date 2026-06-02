@@ -293,20 +293,20 @@ const PlanCard = ({ title, price, featured, features, active, onSelect }: any) =
 const HardwareTips = () => (
   <div className="relative overflow-hidden rounded-[40px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
     {/* Top accent bar */}
-    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
+    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500" />
 
-    <div className="p-8 md:p-10 space-y-8">
+    <div className="p-8 md:p-10 space-y-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100 dark:border-blue-500/20 mb-3">
-            <Zap size={12} /> Aprovechá al Máximo KIOSNET
+            <Zap size={12} /> hardware 100% compatible y listo
           </span>
           <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white leading-tight">
-            Equipá tu caja y vendé como un profesional
+            Equipá tu caja y vendé como las grandes cadenas
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-2 max-w-xl">
-            Con un lector de código de barras y una ticketera térmica de 80mm, KIOSNET funciona a plena velocidad — exactamente como los sistemas de grandes cadenas de comercio.
+          <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-2 max-w-2xl">
+            KIOSNET ya está programado para recibir tus dispositivos. Conectá tus periféricos mediante USB o Bluetooth y el sistema los detectará de forma automática y transparente.
           </p>
         </div>
         <div className="hidden md:flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl shadow-xl shadow-blue-500/25 flex-shrink-0">
@@ -314,91 +314,102 @@ const HardwareTips = () => (
         </div>
       </div>
 
-      {/* Two Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Grid of Devices */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
         {/* Barcode Scanner Card */}
-        <div className="group relative rounded-3xl border border-blue-100 dark:border-blue-500/20 bg-blue-50/50 dark:bg-blue-500/5 p-6 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 hover:-translate-y-1">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 flex-shrink-0">
-              <ScanBarcode size={26} />
+        <div className="group relative rounded-[32px] border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 hover:-translate-y-1">
+          <div className="space-y-4">
+            <div className="w-full h-40 bg-slate-200 dark:bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-100 dark:border-slate-800 flex items-center justify-center p-1">
+              <img src="/barcode_scanner_mockup_1780360667453.png" alt="Lector Código de Barras" className="w-full h-full object-cover rounded-xl" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">Lector de Código de Barras</h3>
-              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5">USB / Bluetooth</p>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Lector de Códigos</h3>
+              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5">Lectora de barra USB/Bluetooth</p>
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              Añadí artículos al carrito al instante, realizá búsquedas inteligentes de stock y evitá errores humanos al cargar precios manualmente.
+            </p>
           </div>
-          <ul className="mt-5 space-y-3">
-            {[
-              'Añadí productos al carrito al instante — sin tipear nada',
-              'Buscá en tu inventario con un simple escaneo',
-              'Eliminá errores de carga y acelerá cada venta',
-              'Compatible con cualquier lector HID estándar'
-            ].map((tip, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                <CheckCircle2 size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                {tip}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-6 pt-4 border-t border-blue-100 dark:border-blue-500/20">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Velocidad de carga</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="flex-1 h-2 bg-blue-100 dark:bg-blue-500/20 rounded-full overflow-hidden">
-                <div className="h-full w-[96%] bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
-              </div>
-              <span className="text-xs font-black text-blue-600">×10 más rápido</span>
-            </div>
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+            <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
+              🔌 Conectar y listo
+            </span>
           </div>
         </div>
 
         {/* Thermal Printer Card */}
-        <div className="group relative rounded-3xl border border-violet-100 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-500/5 p-6 hover:shadow-xl hover:shadow-violet-500/10 transition-all duration-300 hover:-translate-y-1">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 bg-violet-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/20 flex-shrink-0">
-              <Printer size={26} />
+        <div className="group relative rounded-[32px] border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300 hover:-translate-y-1">
+          <div className="space-y-4">
+            <div className="w-full h-40 bg-slate-200 dark:bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-100 dark:border-slate-800 flex items-center justify-center p-1">
+              <img src="/thermal_printer_mockup_1780360685003.png" alt="Impresora Térmica" className="w-full h-full object-cover rounded-xl" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-slate-900 dark:text-white">Ticketera Térmica 80mm</h3>
-              <p className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest mt-0.5">USB / Serie</p>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Ticketera Térmica</h3>
+              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-0.5">Impresora estándar 80mm</p>
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              Imprimí comprobantes profesionales para tus clientes directamente desde la pantalla de venta. Compatible con comandos ESC/POS estándar.
+            </p>
           </div>
-          <ul className="mt-5 space-y-3">
-            {[
-              'Imprimí tickets profesionales desde el POS con un clic',
-              'Formato 80mm optimizado — logo, CUIT, ítems y vuelto',
-              'Compatible con impresoras ESC/POS estándar del mercado',
-              'Tus clientes se van con comprobante: más confianza y orden'
-            ].map((tip, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-300 font-medium">
-                <CheckCircle2 size={16} className="text-violet-500 flex-shrink-0 mt-0.5" />
-                {tip}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-6 pt-4 border-t border-violet-100 dark:border-violet-500/20">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Experiencia del cliente</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="flex-1 h-2 bg-violet-100 dark:bg-violet-500/20 rounded-full overflow-hidden">
-                <div className="h-full w-[92%] bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
-              </div>
-              <span className="text-xs font-black text-violet-600">Nivel Pro</span>
-            </div>
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+            <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
+              🧾 Compatible 100%
+            </span>
           </div>
         </div>
+
+        {/* Customer Broadcast Display Card */}
+        <div className="group relative rounded-[32px] border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-300 hover:-translate-y-1">
+          <div className="space-y-4">
+            <div className="w-full h-40 bg-slate-200 dark:bg-slate-950 rounded-2xl overflow-hidden relative border border-slate-100 dark:border-slate-800 flex items-center justify-center p-1">
+              <img src="/customer_display_mockup_1780360703023.png" alt="Pantalla de Clientes" className="w-full h-full object-cover rounded-xl" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Pantalla Cliente</h3>
+              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-0.5">Terminal Broadcast KIOSNET</p>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              Usa una segunda tablet o monitor para que tu cliente visualice el detalle de su compra y el saldo en tiempo real. ¡Genera máxima confianza de compra!
+            </p>
+          </div>
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center">
+            <span className="text-[10px] font-black text-amber-500 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
+              ⭐ Exclusivo PRO
+            </span>
+            <a href="/display" target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 hover:underline">
+              Abrir Pantalla →
+            </a>
+          </div>
+        </div>
+
       </div>
 
-      {/* Bottom Tip */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl px-6 py-4 border border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center">
-            <Zap size={16} className="text-white" />
+      {/* Support and Setup Assistance Banner */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-55 dark:bg-slate-800/40 rounded-3xl p-6 border border-slate-100 dark:border-slate-800/80 shadow-inner">
+        <div className="flex items-start gap-4 text-left">
+          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
+            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-1.921c1.554.922 3.19 1.408 4.887 1.409 5.864 0 10.635-4.757 10.638-10.613.002-2.836-1.1-5.503-3.102-7.51-2.003-2.008-4.667-3.112-7.502-3.113-5.869 0-10.64 4.757-10.643 10.615-.001 1.83.488 3.619 1.417 5.176L1.83 22.097l5.062-1.849zm12.015-8.18c-.31-.156-1.839-.908-2.11-.1-.271.1-.387.417-.474.517-.087.1-.175.111-.486-.044-.31-.156-1.31-.483-2.495-1.54-.922-.822-1.543-1.838-1.724-2.15-.18-.31-.019-.478.136-.633.14-.139.31-.361.466-.543.156-.183.208-.313.31-.522.104-.21.052-.392-.026-.549-.078-.156-.685-1.651-.938-2.26-.247-.594-.499-.514-.685-.523-.175-.009-.377-.01-.58-.01a1.116 1.116 0 00-.809.378c-.277.311-1.057 1.033-1.057 2.52 0 1.487 1.082 2.922 1.232 3.122.15.2.2.13 1.134 3.013.9.78 1.637 1.543 2.5 1.868.863.325 1.653.24 2.273.15.688-.1 1.839-.751 2.1-.1.26.65.26 1.205.13 1.438-.13.233-.387.35-.698.506z" />
+            </svg>
           </div>
-          <span className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Consejo Pro</span>
+          <div>
+            <h4 className="font-black text-slate-900 dark:text-white text-base">¿Tenés alguna duda o necesitas ayuda técnica para configurarlos?</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl font-medium">
+              Ponete en contacto de inmediato conmigo a través de mi celular de soporte de KIOSNET. Te guío paso a paso en la conexión sin cargo.
+            </p>
+          </div>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium text-center sm:text-left">
-          Conectá el lector al puerto USB y KIOSNET lo detecta automáticamente. No requiere ningún driver ni configuración extra.
-        </p>
+        <a 
+          href="https://wa.me/5492617048835?text=Hola!%20Necesito%20ayuda%20para%20conectar%20el%20lector/impresora%20en%20KIOSNET"
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-sm px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap"
+        >
+          Hablar con Soporte
+        </a>
       </div>
+
     </div>
   </div>
 );
