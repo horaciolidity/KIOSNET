@@ -45,6 +45,7 @@ interface Tenant {
     months: number;
     amount: number;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    senderAccount?: string;
   } | null;
 }
 
@@ -296,6 +297,93 @@ const SuperAdmin: React.FC = () => {
         </button>
       </div>
 
+      {/* ⚠ PAGOS PENDIENTES BANNER */}
+      {tenants.filter(t => t.paymentNotification?.status === 'PENDING').length > 0 && (
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-[32px] p-6 shadow-2xl shadow-orange-500/25">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center relative">
+                <DollarSign size={28} className="text-white" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {tenants.filter(t => t.paymentNotification?.status === 'PENDING').length}
+                </span>
+              </div>
+              <div>
+                <p className="text-white/80 text-xs font-black uppercase tracking-widest">Acción Requerida</p>
+                <h3 className="text-white text-xl font-black">
+                  {tenants.filter(t => t.paymentNotification?.status === 'PENDING').length === 1
+                    ? '1 Pago Pendiente de Aprobación'
+                    : `${tenants.filter(t => t.paymentNotification?.status === 'PENDING').length} Pagos Pendientes de Aprobación`
+                  }
+                </h3>
+                <p className="text-white/70 text-xs mt-0.5">
+                  Los comercios marcados con «NUEVO PAGO» en la tabla de abajo esperan confirmación.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {tenants.filter(t => t.paymentNotification?.status === 'PENDING').map(t => (
+                <div key={t.id} className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3 flex items-center gap-4">
+                  <div className="text-left flex-1">
+                    <p className="text-white font-black text-sm">{t.name}</p>
+                    <p className="text-white/70 text-xs">
+                      Plan {t.paymentNotification!.plan} — {t.paymentNotification!.months} mes{t.paymentNotification!.months > 1 ? 'es' : ''} — ${t.paymentNotification!.amount.toLocaleString()} ARS
+                    </p>
+                    <p className="text-white/50 text-[10px]">
+                      Notificado: {new Date(t.paymentNotification!.notifiedAt).toLocaleString('es-AR')}
+                    </p>
+                    {t.paymentNotification!.senderAccount && (
+                      <p className="text-white bg-slate-950/20 border border-white/15 px-2 py-0.5 rounded-lg text-[10px] font-mono mt-1 inline-block">
+                        Emisor: <strong>{t.paymentNotification!.senderAccount}</strong>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          let baseDate = new Date();
+                          if (t.subActive && t.subExpiresAt && new Date(t.subExpiresAt) > new Date()) {
+                            baseDate = new Date(t.subExpiresAt);
+                          }
+                          baseDate.setMonth(baseDate.getMonth() + t.paymentNotification!.months);
+                          const { error } = await supabase.from('Tenant').update({
+                            subActive: true,
+                            plan: t.paymentNotification!.plan,
+                            subExpiresAt: baseDate.toISOString(),
+                            paymentNotification: { ...t.paymentNotification, status: 'APPROVED' }
+                          }).eq('id', t.id);
+                          if (error) throw error;
+                          alert('¡Aprobado y activado!');
+                          fetchData();
+                        } catch (err: any) { alert('Error: ' + err.message); }
+                      }}
+                      className="bg-white text-orange-600 hover:bg-orange-50 font-black text-xs px-4 py-2 rounded-xl transition-all active:scale-95"
+                    >
+                      Aprobar
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { error } = await supabase.from('Tenant').update({
+                            paymentNotification: { ...t.paymentNotification, status: 'REJECTED' }
+                          }).eq('id', t.id);
+                          if (error) throw error;
+                          fetchData();
+                        } catch (err: any) { alert('Error: ' + err.message); }
+                      }}
+                      className="bg-white/20 hover:bg-red-500/30 text-white font-black text-xs px-4 py-2 rounded-xl transition-all active:scale-95"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {feedbackMessage && (
         <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
           feedbackMessage.type === 'success' 
@@ -487,6 +575,11 @@ const SuperAdmin: React.FC = () => {
                             <p className="text-[10px] font-bold text-slate-900 dark:text-white">
                               Total: ${t.paymentNotification.amount.toLocaleString()} ARS
                             </p>
+                            {t.paymentNotification.senderAccount && (
+                              <p className="text-[9px] bg-slate-950/10 text-slate-600 dark:text-slate-300 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1 font-mono mt-1 overflow-hidden truncate max-w-[200px]">
+                                Emisor: <strong>{t.paymentNotification.senderAccount}</strong>
+                              </p>
+                            )}
                             <div className="flex gap-1.5 mt-2">
                               <button
                                 onClick={async () => {

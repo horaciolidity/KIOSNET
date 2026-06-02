@@ -12,6 +12,8 @@ const SubscriptionPay: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+  const [notified, setNotified] = useState(false);
   const [checking, setChecking] = useState(false);
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
@@ -198,6 +200,38 @@ const SubscriptionPay: React.FC = () => {
   }, [paymentOpened, qrImageUrl, user, token, selectedPlan, selectedMonths, setAuth, setSubscriptionActive]);
 
 
+  // ── Notificar pago manualmente al superadmin ──────────────────────────────
+  const handleNotifyPayment = async (senderAccount?: string) => {
+    const tenantId = user?.tenantId;
+    if (!tenantId) return;
+    setNotifying(true);
+    try {
+      const { error: notifyErr } = await supabase
+        .from('Tenant')
+        .update({
+          paymentNotification: {
+            notifiedAt: new Date().toISOString(),
+            plan: selectedPlan,
+            months: selectedMonths,
+            amount: (selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths,
+            status: 'PENDING',
+            senderAccount: senderAccount || 'No especificada'
+          }
+        })
+        .eq('id', tenantId);
+
+      if (notifyErr) throw notifyErr;
+
+      setNotified(true);
+      alert('¡Pago Notificado con Éxito! El administrador ha sido alertado y activará tu cuenta a la brevedad.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Error al notificar el pago: ' + (err.message || err));
+    } finally {
+      setNotifying(false);
+    }
+  };
+
   const handlePaySubscription = async () => {
     setLoading(true);
     setError('');
@@ -226,6 +260,7 @@ const SubscriptionPay: React.FC = () => {
             failure: `${window.location.origin}/dashboard?sub=failure`,
             pending: `${window.location.origin}/dashboard?sub=pending`
           },
+          auto_return: 'approved',
           external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
         },
         {
@@ -280,6 +315,7 @@ const SubscriptionPay: React.FC = () => {
             failure: `${window.location.origin}/dashboard?sub=failure`,
             pending: `${window.location.origin}/dashboard?sub=pending`
           },
+          auto_return: 'approved',
           external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
         },
         {
@@ -592,6 +628,46 @@ const SubscriptionPay: React.FC = () => {
             </p>
             </div>
 
+            {/* Notificar pago manual (para transferencias bancarias o si MP no confirma) */}
+            <div className="mt-2 p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-3">
+              <div className="text-left">
+                <p className="text-amber-400 font-bold text-sm flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  ¿Ya realizaste la transferencia?
+                </p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Si pagaste por transferencia bancaria al alias <strong className="text-blue-400 font-mono">horacio.asa</strong> o por cualquier otro medio, notificá al administrador para que active tu cuenta.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const account = prompt('Por favor, ingresa el NOMBRE del titular de la cuenta o banco desde donde enviaste el pago para que el administrador pueda identificarlo rápidamente:');
+                  if (account === null) return; // cancelado
+                  handleNotifyPayment(account);
+                }}
+                disabled={notifying || notified}
+                className={`w-full font-extrabold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-pointer ${
+                  notified
+                    ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 cursor-default'
+                    : 'bg-amber-500 hover:bg-amber-400 text-slate-900'
+                } disabled:opacity-70`}
+              >
+                {notifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : notified ? (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    ¡Notificación Enviada!
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 animate-pulse" />
+                    Notificar Pago al Administrador
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* General Support Help Link */}
             <div className="mt-6 pt-6 border-t border-white/5 flex flex-col items-center justify-center gap-2">
               <p className="text-xs text-slate-400 font-medium">¿Tienes alguna duda o error con tu suscripción?</p>
@@ -657,39 +733,31 @@ const SubscriptionPay: React.FC = () => {
                     </p>
                     
                     <button
-                      onClick={async () => {
-                        try {
-                          const tenantId = user?.tenantId;
-                          if (!tenantId) return;
-                          
-                          // Notificar creando/actualizando una columna o generando alerta directa.
-                          // Crearemos un registro o marcaremos un flag en el Tenant para que el superadmin lo vea de inmediato.
-                          // También mostramos una alerta visual interactiva al usuario.
-                          const { error: notifyErr } = await supabase
-                            .from('Tenant')
-                            .update({
-                              paymentNotification: {
-                                notifiedAt: new Date().toISOString(),
-                                plan: selectedPlan,
-                                months: selectedMonths,
-                                amount: (selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths,
-                                status: 'PENDING'
-                              }
-                            })
-                            .eq('id', tenantId);
-                            
-                          if (notifyErr) throw notifyErr;
-                          
-                          alert('¡Pago Notificado con Éxito! El administrador horacio.asa ha sido alertado y activará tu cuenta a la brevedad.');
-                        } catch (err: any) {
-                          console.error(err);
-                          alert('Error al notificar el pago: ' + (err.message || err));
-                        }
+                      onClick={() => {
+                        const account = prompt('Por favor, ingresa el NOMBRE del titular de la cuenta o banco desde donde enviaste el pago para que el administrador pueda identificarlo rápidamente:');
+                        if (account === null) return; // cancelado
+                        handleNotifyPayment(account);
                       }}
-                      className="w-full mt-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-pointer"
+                      disabled={notifying || notified}
+                      className={`w-full mt-3 font-extrabold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider cursor-pointer ${
+                        notified
+                          ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-400'
+                          : 'bg-amber-500 hover:bg-amber-400 text-slate-900'
+                      } disabled:opacity-70`}
                     >
-                      <Sparkles className="w-4 h-4 animate-pulse" />
-                      Notificar Pago al Administrador
+                      {notifying ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : notified ? (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          ¡Notificación Enviada!
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 animate-pulse" />
+                          Notificar Pago al Administrador
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
