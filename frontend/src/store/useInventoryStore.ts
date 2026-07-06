@@ -17,6 +17,8 @@ export interface Product {
   category: ProductCategory;
   active: boolean;
   createdAt: string;
+  wholesalePrice?: number | null;
+  wholesaleMinQty?: number | null;
 }
 
 interface InventoryState {
@@ -86,6 +88,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         category: (p.category?.name || 'Otros') as ProductCategory,
         active: p.active,
         createdAt: p.createdAt,
+        wholesalePrice: p.wholesalePrice != null ? Number(p.wholesalePrice) : null,
+        wholesaleMinQty: p.wholesaleMinQty != null ? Number(p.wholesaleMinQty) : null,
       }));
       set({ products: mapped, loading: false });
     } catch (error) {
@@ -142,6 +146,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         tenantId,
         active: true,
         updatedAt: new Date().toISOString(),
+        wholesalePrice: productData.wholesalePrice !== undefined && productData.wholesalePrice !== null && productData.wholesalePrice !== '' ? Number(productData.wholesalePrice) : null,
+        wholesaleMinQty: productData.wholesaleMinQty !== undefined && productData.wholesaleMinQty !== null && productData.wholesaleMinQty !== '' ? Number(productData.wholesaleMinQty) : null,
       };
 
       const { data: savedProduct, error: insertError } = await supabase
@@ -194,6 +200,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         minStock: productData.minStock !== undefined ? Number(productData.minStock) : undefined,
         unit: productData.unit,
         active: productData.active,
+        wholesalePrice: productData.wholesalePrice !== undefined ? (productData.wholesalePrice !== null && productData.wholesalePrice !== '' ? Number(productData.wholesalePrice) : null) : undefined,
+        wholesaleMinQty: productData.wholesaleMinQty !== undefined ? (productData.wholesaleMinQty !== null && productData.wholesaleMinQty !== '' ? Number(productData.wholesaleMinQty) : null) : undefined,
       };
 
       // Clean undefined keys

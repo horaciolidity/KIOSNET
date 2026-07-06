@@ -115,7 +115,14 @@ const POS: React.FC = () => {
     }));
   };
 
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const getItemPrice = (item: CartItem) => {
+    if (item.wholesalePrice != null && item.wholesaleMinQty != null && item.quantity >= item.wholesaleMinQty) {
+      return item.wholesalePrice;
+    }
+    return item.price;
+  };
+
+  const total = cart.reduce((sum, item) => sum + (getItemPrice(item) * item.quantity), 0);
   const totalCost = cart.reduce((sum, item) => sum + (item.costPrice * item.quantity), 0);
   const profit = total - totalCost;
   const change = Number(amountPaid) > 0 ? Number(amountPaid) - total : 0;
@@ -212,7 +219,7 @@ const POS: React.FC = () => {
           saleId: newSaleId,
           productId: item.id,
           quantity: Number(item.quantity),
-          price: Number(item.price),
+          price: Number(getItemPrice(item)),
           costPrice: Number(item.costPrice)
         })));
 
@@ -606,7 +613,7 @@ const POS: React.FC = () => {
       </div>
 
       {/* Cart Side */}
-      <div className="hidden md:flex w-[420px] bg-white dark:bg-slate-900 flex flex-col shadow-2xl z-10 print:hidden">
+      <div className="hidden md:flex w-[420px] bg-white dark:bg-slate-900 flex-col shadow-2xl z-10 print:hidden">
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
           <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <ShoppingCart size={24} className="text-blue-600" /> Venta Actual
@@ -632,13 +639,20 @@ const POS: React.FC = () => {
                   <p className="font-bold text-slate-900 dark:text-white truncate text-sm">{item.name}</p>
                   <p className="text-slate-400 text-xs font-semibold">
                     {item.unit === 'KILO' 
-                      ? `${Math.round(item.quantity * 1000)}g x $${item.price.toLocaleString()}/Kg` 
+                      ? `${Math.round(item.quantity * 1000)}g x $${getItemPrice(item).toLocaleString()}/Kg` 
                       : item.unit === 'LITRO' 
-                        ? `${Math.round(item.quantity * 1000)}cc x $${item.price.toLocaleString()}/L` 
-                        : `${item.quantity} Ud x $${item.price.toLocaleString()}/Ud`
+                        ? `${Math.round(item.quantity * 1000)}cc x $${getItemPrice(item).toLocaleString()}/L` 
+                        : `${item.quantity} Ud x $${getItemPrice(item).toLocaleString()}/Ud`
                     }
                   </p>
-                  <p className="text-blue-600 font-black text-sm">${(item.price * item.quantity).toLocaleString()}</p>
+                  <p className="text-blue-600 font-black text-sm flex items-center gap-1.5">
+                    ${(getItemPrice(item) * item.quantity).toLocaleString()}
+                    {item.wholesalePrice != null && item.wholesaleMinQty != null && item.quantity >= item.wholesaleMinQty && (
+                      <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter">
+                        Mayor
+                      </span>
+                    )}
+                  </p>
                 </div>
                 {item.unit === 'KILO' || item.unit === 'LITRO' ? (
                   <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -750,13 +764,20 @@ const POS: React.FC = () => {
                     <p className="font-bold text-slate-900 dark:text-white truncate text-sm">{item.name}</p>
                     <p className="text-slate-400 text-xs font-semibold">
                       {item.unit === 'KILO' 
-                        ? `${Math.round(item.quantity * 1000)}g x $${item.price.toLocaleString()}/Kg` 
+                        ? `${Math.round(item.quantity * 1000)}g x $${getItemPrice(item).toLocaleString()}/Kg` 
                         : item.unit === 'LITRO' 
-                          ? `${Math.round(item.quantity * 1000)}cc x $${item.price.toLocaleString()}/L` 
-                          : `${item.quantity} Ud x $${item.price.toLocaleString()}/Ud`
+                          ? `${Math.round(item.quantity * 1000)}cc x $${getItemPrice(item).toLocaleString()}/L` 
+                          : `${item.quantity} Ud x $${getItemPrice(item).toLocaleString()}/Ud`
                       }
                     </p>
-                    <p className="text-blue-600 font-black text-sm">${(item.price * item.quantity).toLocaleString()}</p>
+                    <p className="text-blue-600 font-black text-sm flex items-center gap-1.5">
+                      ${(getItemPrice(item) * item.quantity).toLocaleString()}
+                      {item.wholesalePrice != null && item.wholesaleMinQty != null && item.quantity >= item.wholesaleMinQty && (
+                        <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter">
+                          Mayor
+                        </span>
+                      )}
+                    </p>
                   </div>
                   {item.unit === 'KILO' || item.unit === 'LITRO' ? (
                     <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800">

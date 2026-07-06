@@ -42,7 +42,9 @@ const Inventory: React.FC = () => {
     minStock: '' as string | number,
     unit: 'UNIDAD' as ProductUnit,
     category: 'Otros' as ProductCategory,
-    active: true
+    active: true,
+    wholesalePrice: '' as string | number,
+    wholesaleMinQty: '' as string | number,
   });
 
   const filteredProducts = products.filter(p => 
@@ -61,7 +63,9 @@ const Inventory: React.FC = () => {
       minStock: '5',
       unit: 'UNIDAD',
       category: 'Otros',
-      active: true
+      active: true,
+      wholesalePrice: '',
+      wholesaleMinQty: '',
     });
     setIsModalOpen(true);
   };
@@ -77,7 +81,9 @@ const Inventory: React.FC = () => {
       minStock: product.minStock.toString(),
       unit: product.unit,
       category: product.category,
-      active: product.active
+      active: product.active,
+      wholesalePrice: product.wholesalePrice !== undefined && product.wholesalePrice !== null ? product.wholesalePrice.toString() : '',
+      wholesaleMinQty: product.wholesaleMinQty !== undefined && product.wholesaleMinQty !== null ? product.wholesaleMinQty.toString() : '',
     });
     setIsModalOpen(true);
   };
@@ -91,6 +97,8 @@ const Inventory: React.FC = () => {
       costPrice: Number(formData.costPrice) || 0,
       stock: Number(formData.stock) || 0,
       minStock: Number(formData.minStock) || 0,
+      wholesalePrice: formData.wholesalePrice !== '' ? Number(formData.wholesalePrice) : null,
+      wholesaleMinQty: formData.wholesaleMinQty !== '' ? Number(formData.wholesaleMinQty) : null,
     };
 
     if (editingProduct) {
@@ -294,6 +302,11 @@ const Inventory: React.FC = () => {
                     <div>
                       <p className="text-lg font-black text-emerald-600">${product.price.toLocaleString()}</p>
                       <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Costo: ${product.costPrice}</p>
+                      {product.wholesalePrice != null && (
+                        <p className="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-1">
+                          P. Mayor: ${product.wholesalePrice.toLocaleString()} ({product.wholesaleMinQty} u.)
+                        </p>
+                      )}
                     </div>
                   </td>
                   <td className="px-8 py-5">
@@ -408,6 +421,29 @@ const Inventory: React.FC = () => {
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
                     />
                   </div>
+                </FormGroup>
+
+                <FormGroup label="Precio Mayorista (Opcional)">
+                  <div className="relative">
+                    <span className="absolute left-4 top-3.5 text-blue-500 font-bold">$</span>
+                    <input 
+                      type="number" 
+                      className="form-input pl-8 border-blue-500/20 focus:ring-blue-500/10" 
+                      value={formData.wholesalePrice}
+                      placeholder="Sin precio mayorista"
+                      onChange={(e) => setFormData({...formData, wholesalePrice: e.target.value})}
+                    />
+                  </div>
+                </FormGroup>
+
+                <FormGroup label="Cant. Mínima Mayorista">
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={formData.wholesaleMinQty}
+                    placeholder="Mínimo de unidades (Ej: 5)"
+                    onChange={(e) => setFormData({...formData, wholesaleMinQty: e.target.value})}
+                  />
                 </FormGroup>
 
                 <FormGroup label="Stock Actual">
