@@ -146,8 +146,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         tenantId,
         active: true,
         updatedAt: new Date().toISOString(),
-        wholesalePrice: productData.wholesalePrice !== undefined && productData.wholesalePrice !== null && productData.wholesalePrice !== '' ? Number(productData.wholesalePrice) : null,
-        wholesaleMinQty: productData.wholesaleMinQty !== undefined && productData.wholesaleMinQty !== null && productData.wholesaleMinQty !== '' ? Number(productData.wholesaleMinQty) : null,
+        wholesalePrice: productData.wholesalePrice !== undefined && productData.wholesalePrice !== null && String(productData.wholesalePrice) !== '' ? Number(productData.wholesalePrice) : null,
+        wholesaleMinQty: productData.wholesaleMinQty !== undefined && productData.wholesaleMinQty !== null && String(productData.wholesaleMinQty) !== '' ? Number(productData.wholesaleMinQty) : null,
       };
 
       const { data: savedProduct, error: insertError } = await supabase
@@ -200,8 +200,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         minStock: productData.minStock !== undefined ? Number(productData.minStock) : undefined,
         unit: productData.unit,
         active: productData.active,
-        wholesalePrice: productData.wholesalePrice !== undefined ? (productData.wholesalePrice !== null && productData.wholesalePrice !== '' ? Number(productData.wholesalePrice) : null) : undefined,
-        wholesaleMinQty: productData.wholesaleMinQty !== undefined ? (productData.wholesaleMinQty !== null && productData.wholesaleMinQty !== '' ? Number(productData.wholesaleMinQty) : null) : undefined,
+        wholesalePrice: productData.wholesalePrice !== undefined ? (productData.wholesalePrice !== null && String(productData.wholesalePrice) !== '' ? Number(productData.wholesalePrice) : null) : undefined,
+        wholesaleMinQty: productData.wholesaleMinQty !== undefined ? (productData.wholesaleMinQty !== null && String(productData.wholesaleMinQty) !== '' ? Number(productData.wholesaleMinQty) : null) : undefined,
       };
 
       // Clean undefined keys
