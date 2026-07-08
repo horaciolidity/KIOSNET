@@ -33,6 +33,7 @@ const Dashboard: React.FC = () => {
   }, [fetchHistory]);
 
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
+  const [hardwareLinks, setHardwareLinks] = useState({ link_scanner: '', link_printer: '', link_display: '' });
 
   // Fetch plan prices from dynamic pricing backend API
   useEffect(() => {
@@ -47,9 +48,18 @@ const Dashboard: React.FC = () => {
         if (data) {
           const standardPrice = data.find((c: any) => c.key === 'price_standard')?.value;
           const proPrice = data.find((c: any) => c.key === 'price_pro')?.value;
+          const linkScanner = data.find((c: any) => c.key === 'link_scanner')?.value || '';
+          const linkPrinter = data.find((c: any) => c.key === 'link_printer')?.value || '';
+          const linkDisplay = data.find((c: any) => c.key === 'link_display')?.value || '';
+
           setPrices({
             price_standard: standardPrice ? Number(standardPrice) : 12320,
             price_pro: proPrice ? Number(proPrice) : 15730
+          });
+          setHardwareLinks({
+            link_scanner: linkScanner,
+            link_printer: linkPrinter,
+            link_display: linkDisplay
           });
         }
       } catch (err) {
@@ -157,7 +167,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Hardware Tips Banner */}
-      <HardwareTips />
+      <HardwareTips hardwareLinks={hardwareLinks} />
 
       {/* Plans Section */}
       <div className="space-y-6">
@@ -290,7 +300,7 @@ const PlanCard = ({ title, price, featured, features, active, onSelect }: any) =
   </div>
 );
 
-const HardwareTips = () => (
+const HardwareTips = ({ hardwareLinks }: { hardwareLinks: { link_scanner: string; link_printer: string; link_display: string } }) => (
   <div className="relative overflow-hidden rounded-[40px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
     {/* Top accent bar */}
     <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500" />
@@ -331,10 +341,15 @@ const HardwareTips = () => (
               Añadí artículos al carrito al instante, realizá búsquedas inteligentes de stock y evitá errores humanos al cargar precios manualmente.
             </p>
           </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center">
             <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
               🔌 Conectar y listo
             </span>
+            {hardwareLinks.link_scanner && (
+              <a href={hardwareLinks.link_scanner} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 hover:underline">
+                Comprar recomendado →
+              </a>
+            )}
           </div>
         </div>
 
@@ -352,10 +367,15 @@ const HardwareTips = () => (
               Imprimí comprobantes profesionales para tus clientes directamente desde la pantalla de venta. Compatible con comandos ESC/POS estándar.
             </p>
           </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center">
             <span className="text-[10px] font-black text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
               🧾 Compatible 100%
             </span>
+            {hardwareLinks.link_printer && (
+              <a href={hardwareLinks.link_printer} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-indigo-600 hover:underline">
+                Comprar recomendado →
+              </a>
+            )}
           </div>
         </div>
 
@@ -374,12 +394,19 @@ const HardwareTips = () => (
             </p>
           </div>
           <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center">
-            <span className="text-[10px] font-black text-amber-500 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
-              ⭐ Exclusivo PRO
-            </span>
-            <a href="/display" target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 hover:underline">
-              Abrir Pantalla →
-            </a>
+            <div className="flex gap-2 items-center">
+              <span className="text-[10px] font-black text-amber-500 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
+                ⭐ Exclusivo PRO
+              </span>
+              <a href="/display" target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 hover:underline">
+                Abrir Pantalla →
+              </a>
+            </div>
+            {hardwareLinks.link_display && (
+              <a href={hardwareLinks.link_display} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-emerald-600 hover:underline">
+                Comprar recomendado →
+              </a>
+            )}
           </div>
         </div>
 

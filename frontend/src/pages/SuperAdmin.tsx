@@ -14,7 +14,8 @@ import {
   Key,
   X,
   Calendar,
-  Power
+  Power,
+  Link2
 } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 
@@ -57,8 +58,10 @@ interface PricingConfig {
 const SuperAdmin: React.FC = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [prices, setPrices] = useState<PricingConfig>({ price_standard: 12320, price_pro: 15730 });
+  const [links, setLinks] = useState({ link_scanner: '', link_printer: '', link_display: '' });
   const [loading, setLoading] = useState(true);
   const [savingPrices, setSavingPrices] = useState(false);
+  const [savingLinks, setSavingLinks] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [planFilter, setPlanFilter] = useState<'ALL' | 'FREE' | 'STANDARD' | 'PRO'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'EXPIRED'>('ALL');
@@ -88,11 +91,17 @@ const SuperAdmin: React.FC = () => {
 
       let priceStandard = 12320;
       let pricePro = 15730;
+      let linkScanner = '';
+      let linkPrinter = '';
+      let linkDisplay = '';
 
       configPrices?.forEach(cfg => {
         const val = Number(cfg.value);
         if (cfg.key === 'price_standard' && !isNaN(val)) priceStandard = val;
         if (cfg.key === 'price_pro' && !isNaN(val)) pricePro = val;
+        if (cfg.key === 'link_scanner') linkScanner = cfg.value || '';
+        if (cfg.key === 'link_printer') linkPrinter = cfg.value || '';
+        if (cfg.key === 'link_display') linkDisplay = cfg.value || '';
       });
 
       const mappedTenants: Tenant[] = (tenantsData || []).map((t: any) => ({
@@ -114,6 +123,11 @@ const SuperAdmin: React.FC = () => {
       setPrices({
         price_standard: priceStandard,
         price_pro: pricePro
+      });
+      setLinks({
+        link_scanner: linkScanner,
+        link_printer: linkPrinter,
+        link_display: linkDisplay
       });
       setFeedbackMessage(null);
     } catch (error: any) {
@@ -162,6 +176,38 @@ const SuperAdmin: React.FC = () => {
       setFeedbackMessage({ type: 'error', text: error.message || 'Error al guardar los precios.' });
     } finally {
       setSavingPrices(false);
+    }
+  };
+
+  const saveLinks = async () => {
+    try {
+      setSavingLinks(true);
+      
+      const { error: errScanner } = await supabase
+        .from('SystemConfig')
+        .upsert({ key: 'link_scanner', value: links.link_scanner });
+        
+      if (errScanner) throw errScanner;
+
+      const { error: errPrinter } = await supabase
+        .from('SystemConfig')
+        .upsert({ key: 'link_printer', value: links.link_printer });
+        
+      if (errPrinter) throw errPrinter;
+
+      const { error: errDisplay } = await supabase
+        .from('SystemConfig')
+        .upsert({ key: 'link_display', value: links.link_display });
+
+      if (errDisplay) throw errDisplay;
+
+      setFeedbackMessage({ type: 'success', text: 'Enlaces de recomendación de hardware actualizados con éxito.' });
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } catch (error: any) {
+      console.error('Error saving links:', error);
+      setFeedbackMessage({ type: 'error', text: error.message || 'Error al guardar los enlaces.' });
+    } finally {
+      setSavingLinks(false);
     }
   };
 
@@ -474,6 +520,61 @@ const SuperAdmin: React.FC = () => {
             className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
           >
             <Save size={20} /> {savingPrices ? 'Guardando...' : 'Guardar Precios'}
+          </button>
+        </div>
+      </div>
+
+      {/* Enlaces de Recomendación de Hardware */}
+      <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 p-8 shadow-sm space-y-6">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Link2 size={24} className="text-blue-500" /> Enlaces de Recomendación (Afiliados)
+          </h2>
+          <p className="text-sm text-slate-500 font-medium mt-1">Configura las URLs de compra de los productos recomendados que verán los usuarios en el Dashboard.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Lector de Códigos</label>
+            <input 
+              type="text" 
+              value={links.link_scanner}
+              onChange={(e) => setLinks(prev => ({ ...prev, link_scanner: e.target.value }))}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="https://mercadolibre.com.ar/ejemplo-scanner"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Ticketera Térmica</label>
+            <input 
+              type="text" 
+              value={links.link_printer}
+              onChange={(e) => setLinks(prev => ({ ...prev, link_printer: e.target.value }))}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="https://mercadolibre.com.ar/ejemplo-ticketera"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Pantalla Cliente (Tablet/Soporte)</label>
+            <input 
+              type="text" 
+              value={links.link_display}
+              onChange={(e) => setLinks(prev => ({ ...prev, link_display: e.target.value }))}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="https://mercadolibre.com.ar/ejemplo-soporte-tablet"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+          <button 
+            onClick={saveLinks}
+            disabled={savingLinks}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+          >
+            <Save size={20} /> {savingLinks ? 'Guardando...' : 'Guardar Enlaces'}
           </button>
         </div>
       </div>
