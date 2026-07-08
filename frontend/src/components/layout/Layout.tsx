@@ -95,6 +95,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           let approvedPaymentFound = false;
           let approvedPlan = plan;
           let approvedMonths = months;
+          let isUpgradePayment = false;
+
+          // Fetch tenant first to read current date and plan details
+          const { data: tenant, error: fetchErr } = await supabase
+            .from('Tenant')
+            .select('*')
+            .eq('id', tenantId)
+            .single();
+
+          if (fetchErr) throw fetchErr;
 
           try {
             // Strategy 1: Direct payment lookup if we have paymentId
@@ -107,48 +117,62 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 approvedPaymentFound = true;
                 const parts = paymentInfo.external_reference.split('_');
                 approvedPlan = (parts[1] || plan) as 'STANDARD' | 'PRO';
-                approvedMonths = parseInt(parts[3], 10) || months;
+                if (parts[3] === 'upgrade') {
+                  isUpgradePayment = true;
+                  approvedMonths = 0;
+                } else {
+                  approvedMonths = parseInt(parts[3], 10) || months;
+                }
               }
             }
 
             // Strategy 2: Search by external_reference
             if (!approvedPaymentFound) {
-              const ref = `sub_${plan}_${tenantId}_${months}`;
+              const remainingDays = tenant?.subExpiresAt ? Math.max(1, Math.ceil((new Date(tenant.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+              const isUpgradeMode = months === 0 || (tenant?.subActive && tenant?.plan === 'STANDARD' && plan === 'PRO');
+              const ref = isUpgradeMode 
+                ? `sub_PRO_${tenantId}_upgrade_${remainingDays}` 
+                : `sub_${plan}_${tenantId}_${months}`;
+                
               const searchResponse = await axios.get(`https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`, {
                 headers: { Authorization: `Bearer ${mpToken}` }
               });
               const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');
               if (approvedPayment) {
                 approvedPaymentFound = true;
-                const parts = ref.split('_');
-                approvedPlan = parts[1] as 'STANDARD' | 'PRO';
-                approvedMonths = parseInt(parts[3], 10) || 1;
+                const refUsed = approvedPayment.external_reference || ref;
+                const parts = refUsed.split('_');
+                approvedPlan = (parts[1] || plan) as 'STANDARD' | 'PRO';
+                if (parts[3] === 'upgrade') {
+                  isUpgradePayment = true;
+                  approvedMonths = 0;
+                } else {
+                  approvedMonths = parseInt(parts[3], 10) || 1;
+                }
               }
             }
 
             if (approvedPaymentFound) {
-              // Update database
-              const { data: tenant, error: fetchErr } = await supabase
-                .from('Tenant')
-                .select('*')
-                .eq('id', tenantId)
-                .single();
-
-              if (fetchErr) throw fetchErr;
-
               let baseDate = new Date();
               if (tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
                 baseDate = new Date(tenant.subExpiresAt);
               }
-              baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+
+              const updatePayload: any = {
+                subActive: true,
+                plan: approvedPlan
+              };
+
+              if (!isUpgradePayment) {
+                baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+                updatePayload.subExpiresAt = baseDate.toISOString();
+              } else {
+                updatePayload.subExpiresAt = tenant?.subExpiresAt || new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+              }
 
               const { data: updatedTenant, error: updateErr } = await supabase
                 .from('Tenant')
-                .update({
-                  subActive: true,
-                  plan: approvedPlan,
-                  subExpiresAt: baseDate.toISOString()
-                })
+                .update(updatePayload)
                 .eq('id', tenantId)
                 .select()
                 .single();

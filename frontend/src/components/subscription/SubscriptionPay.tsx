@@ -460,8 +460,16 @@ const SubscriptionPay: React.FC = () => {
             
             {/* Standard Plan Card */}
             <div 
-              onClick={() => setSelectedPlan('STANDARD')}
+              onClick={() => {
+                if (user?.subActive && user?.plan === 'PRO') {
+                  alert('Tienes un plan PRO activo. Solo puedes volver al plan Estándar una vez que tu suscripción actual haya vencido.');
+                  return;
+                }
+                setSelectedPlan('STANDARD');
+              }}
               className={`p-8 rounded-[32px] border transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
+                user?.subActive && user?.plan === 'PRO' ? 'opacity-40 cursor-not-allowed' : ''
+              } ${
                 selectedPlan === 'STANDARD' 
                   ? 'bg-slate-900/90 border-blue-500/50 shadow-2xl shadow-blue-500/5 ring-1 ring-blue-500/30' 
                   : 'bg-white/5 border-white/10 hover:border-white/20 shadow-lg'
@@ -472,6 +480,9 @@ const SubscriptionPay: React.FC = () => {
                   <div>
                     <h3 className="text-xl font-bold">Uso Estándar</h3>
                     <p className="text-slate-400 text-xs mt-1">El POS perfecto para pequeños comercios.</p>
+                    {user?.subActive && user?.plan === 'PRO' && (
+                      <p className="text-[10px] text-red-400 font-bold uppercase mt-1">Bloqueado (Pro Activo)</p>
+                    )}
                   </div>
                   <span className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
                     selectedPlan === 'STANDARD' 
@@ -558,39 +569,101 @@ const SubscriptionPay: React.FC = () => {
         {!paymentOpened ? (
           <div className="mt-8 max-w-xl mx-auto text-center space-y-6">
             
-            {/* Months Selector */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-left">
-                <h4 className="text-white font-medium">Duración de la suscripción</h4>
-                <p className="text-slate-400 text-sm">Paga más meses juntos y asegura tu acceso</p>
-              </div>
-              <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
-                {[1, 3, 6, 12].map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setSelectedMonths(m)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      selectedMonths === m 
-                        ? 'bg-indigo-500 text-white shadow-md' 
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    {m} {m === 1 ? 'Mes' : 'Meses'}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Months Selector / Upgrade Alert */}
+            {(() => {
+              const isUpgradeMode = user?.subActive && user?.plan === 'STANDARD' && selectedPlan === 'PRO';
+              const remainingDays = user?.subExpiresAt ? Math.max(1, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+              
+              if (isUpgradeMode) {
+                return (
+                  <div className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border border-indigo-500/20 rounded-2xl p-5 text-left space-y-2">
+                    <h4 className="text-white font-bold flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-indigo-400" />
+                      Modo Upgrade Pro Activo
+                    </h4>
+                    <p className="text-slate-300 text-sm">
+                      Tienes una licencia Estándar activa con <strong>{remainingDays} días</strong> restantes. Se te cobrará únicamente la diferencia prorrateada diaria para pasar al plan Pro hasta el final de tu período actual.
+                    </p>
+                    <div className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1">
+                      Tu fecha de vencimiento seguirá siendo la misma.
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-left">
+                    <h4 className="text-white font-medium">Duración de la suscripción</h4>
+                    <p className="text-slate-400 text-sm">Paga más meses juntos y asegura tu acceso</p>
+                  </div>
+                  <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10 relative">
+                    {[1, 3, 6, 12].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setSelectedMonths(m)}
+                        className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          selectedMonths === m 
+                            ? 'bg-indigo-500 text-white shadow-md' 
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {m === 12 ? (
+                          <>
+                            12 Meses
+                            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider animate-bounce whitespace-nowrap">
+                              ¡Pagas 10!
+                            </span>
+                          </>
+                        ) : `${m} ${m === 1 ? 'Mes' : 'Meses'}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="bg-slate-900/50 rounded-2xl p-4 border border-white/10 flex justify-between items-center text-left">
               <div>
                 <p className="text-slate-400 text-sm">Total a pagar</p>
-                <p className="text-white font-bold text-xl">
-                  ${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS
-                </p>
+                {(() => {
+                  const isUpgradeMode = user?.subActive && user?.plan === 'STANDARD' && selectedPlan === 'PRO';
+                  const remainingDays = user?.subExpiresAt ? Math.max(1, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                  
+                  if (isUpgradeMode) {
+                    return (
+                      <p className="text-white font-bold text-xl">
+                        ${Math.max(150, Math.round(remainingDays * ((prices.price_pro - prices.price_standard) / 30))).toLocaleString()} ARS
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-white font-bold text-xl">
+                          ${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * (selectedMonths === 12 ? 10 : selectedMonths)).toLocaleString()} ARS
+                        </p>
+                        {selectedMonths === 12 && (
+                          <span className="text-slate-500 line-through text-xs font-bold">
+                            ${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * 12).toLocaleString()} ARS
+                          </span>
+                        )}
+                      </div>
+                      {selectedMonths === 12 && (
+                        <p className="text-[10px] text-emerald-500 font-black uppercase mt-0.5">¡Promoción activa: 2 meses gratis!</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="text-right">
                 <p className="text-slate-400 text-sm">Plan Seleccionado</p>
-                <p className="text-indigo-400 font-bold uppercase">{selectedPlan} x{selectedMonths}</p>
+                <p className="text-indigo-400 font-bold uppercase">
+                  {user?.subActive && user?.plan === 'STANDARD' && selectedPlan === 'PRO' 
+                    ? 'Upgrade Pro' 
+                    : `${selectedPlan} x${selectedMonths}`}
+                </p>
               </div>
             </div>
 
