@@ -135,6 +135,7 @@ export const useCashStore = create<CashState>((set, get) => ({
             profit: m.profit ?? undefined,
             description: m.description,
             timestamp: m.createdAt,
+            details: m.details ?? undefined,
           };
         });
 
@@ -195,6 +196,7 @@ export const useCashStore = create<CashState>((set, get) => ({
           profit,
           description,
           createdAt,
+          details,
           register:CashRegister!inner(tenantId)
         `)
         .eq('CashRegister.tenantId', user.tenantId)
@@ -212,6 +214,7 @@ export const useCashStore = create<CashState>((set, get) => ({
           profit: m.profit ?? undefined,
           description: m.description,
           timestamp: m.createdAt,
+          details: m.details ?? undefined,
         };
       });
 
@@ -407,7 +410,8 @@ export const useCashStore = create<CashState>((set, get) => ({
           type: mapFrontendTypeToDb(tx.type, tx.amount),
           paymentMethod: tx.method,
           profit: tx.profit ?? null,
-          description: tx.description
+          description: tx.description,
+          details: tx.details ?? null
         })
         .select()
         .single();
