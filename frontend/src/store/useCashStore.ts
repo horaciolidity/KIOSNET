@@ -35,6 +35,16 @@ interface CashState {
   addTransaction: (transaction: Omit<CashTransaction, 'id' | 'timestamp'>) => Promise<void>;
 }
 
+function parseUtcDateString(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString();
+  // If the date string has no timezone offset, append Z to treat it as UTC
+  if (!dateStr.includes('Z') && !dateStr.includes('+') && !/-\d{2}:\d{2}$/.test(dateStr)) {
+    const formatted = dateStr.replace(' ', 'T');
+    return formatted.endsWith('Z') ? formatted : formatted + 'Z';
+  }
+  return dateStr;
+}
+
 function mapFrontendTypeToDb(type: string, amount: number): 'IN' | 'OUT' {
   if (type === 'EGRESO') return 'OUT';
   if (type === 'INGRESO' || type === 'VENTA' || type === 'PAGO_DEUDA') return 'IN';
@@ -134,7 +144,7 @@ export const useCashStore = create<CashState>((set, get) => ({
             method,
             profit: m.profit ?? undefined,
             description: m.description,
-            timestamp: m.createdAt,
+            timestamp: parseUtcDateString(m.createdAt),
             details: m.details ?? undefined,
           };
         });
@@ -213,7 +223,7 @@ export const useCashStore = create<CashState>((set, get) => ({
           method,
           profit: m.profit ?? undefined,
           description: m.description,
-          timestamp: m.createdAt,
+          timestamp: parseUtcDateString(m.createdAt),
           details: m.details ?? undefined,
         };
       });
@@ -336,7 +346,7 @@ export const useCashStore = create<CashState>((set, get) => ({
         amount: amount,
         method: 'EFECTIVO',
         description: 'Cierre de Caja',
-        timestamp: closeMovement.createdAt
+        timestamp: parseUtcDateString(closeMovement.createdAt)
       };
 
       set({
@@ -425,13 +435,13 @@ export const useCashStore = create<CashState>((set, get) => ({
           transactions: state.session.transactions.map((t) => t.id === tempId ? {
             ...t,
             id: savedMovement.id,
-            timestamp: savedMovement.createdAt
+            timestamp: parseUtcDateString(savedMovement.createdAt)
           } : t)
         },
         history: state.history.map((t) => t.id === tempId ? {
           ...t,
           id: savedMovement.id,
-          timestamp: savedMovement.createdAt
+          timestamp: parseUtcDateString(savedMovement.createdAt)
         } : t)
       }));
     } catch (error: any) {
