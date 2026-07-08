@@ -363,23 +363,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
           {/* Real-time Subscription Indicator */}
           {isSidebarOpen && user && (
-            <div className="mb-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 p-4 rounded-2xl flex flex-col items-center text-center space-y-2 animate-in fade-in duration-300">
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">
-                <Wallet size={20} />
+            <div className="mb-2 bg-blue-50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/10 p-2.5 rounded-xl flex flex-col space-y-1 text-xs animate-in fade-in duration-300">
+              <div className="flex justify-between items-center">
+                <span className="font-black text-[9px] uppercase tracking-widest text-blue-600 dark:text-blue-400">
+                  Plan: {user.subActive ? (user.plan === 'PRO' ? 'PRO' : 'ESTÁNDAR') : 'GRATUITO'}
+                </span>
+                {user.subActive ? (
+                  <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md uppercase">Activo</span>
+                ) : (
+                  <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded-md uppercase">Prueba</span>
+                )}
               </div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                Plan: {user.subActive ? (user.plan === 'PRO' ? 'PRO' : 'ESTÁNDAR') : 'GRATUITO'}
-              </p>
+              
               {!user.subActive ? (
-                <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-tight">
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-tight">
                   {Math.max(0, 50 - (user.salesCount ?? 0))} ventas de prueba restantes
                 </p>
               ) : (
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Licencia Activa</p>
+                <div className="space-y-0.5">
                   {user.subExpiresAt && (
                     <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                       Vence: {(() => {
@@ -390,63 +394,63 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   )}
                 </div>
               )}
-              {!user.subActive && !isEmployee && (
-                <button 
-                  onClick={() => navigate('/billing')}
-                  className="w-full mt-2 bg-blue-600 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-md"
+
+              <div className="flex gap-2 mt-1">
+                {!user.subActive && !isEmployee && (
+                  <button 
+                    onClick={() => navigate('/billing')}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-1.5 rounded-lg transition-all text-center uppercase"
+                  >
+                    Activar
+                  </button>
+                )}
+                <a
+                  href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20o%20duda%20con%20el%20sistema%20KIOSNET"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black py-1.5 rounded-lg border border-emerald-500/20 transition-all uppercase tracking-wider"
                 >
-                  Activar Suscripción
-                </button>
-              )}
-              <a
-                href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20o%20duda%20con%20el%20sistema%20KIOSNET"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full mt-2 flex items-center justify-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black py-2.5 rounded-xl border border-emerald-500/20 transition-all uppercase tracking-wider"
-              >
-                Soporte WhatsApp
-              </a>
+                  Soporte
+                </a>
+              </div>
             </div>
           )}
 
           <button 
             onClick={handleRoleToggle}
-            className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all text-left ${
+            className={`w-full flex items-center gap-4 px-4 py-2 rounded-xl transition-all text-left ${
               isEmployee 
-                ? 'bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 animate-pulse' 
+                ? 'bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20' 
                 : 'hover:bg-slate-50 dark:hover:bg-slate-800'
             }`}
           >
             <div className={isEmployee ? 'text-orange-500' : 'text-emerald-500'}>
-              {isEmployee ? <Lock size={20} /> : <Unlock size={20} />}
+              {isEmployee ? <Lock size={18} /> : <Unlock size={18} />}
             </div>
             {isSidebarOpen && (
               <div className="flex-1 leading-none">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Rol Activo</p>
-                <p className={`text-sm font-black mt-0.5 ${isEmployee ? 'text-orange-500' : 'text-emerald-500'}`}>
+                <p className={`text-xs font-black mt-0.5 ${isEmployee ? 'text-orange-500' : 'text-emerald-500'}`}>
                   {isEmployee ? 'Empleado' : 'Administrador'}
                 </p>
-                {isEmployee && (
-                  <p className="text-[9px] text-blue-500 dark:text-blue-400 font-bold mt-1">Clic para Desbloquear</p>
-                )}
               </div>
             )}
           </button>
 
           <button 
             onClick={toggleDarkMode}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            className="w-full flex items-center gap-4 px-4 py-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
           >
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-            {isSidebarOpen && <span className="font-medium">{isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>}
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {isSidebarOpen && <span className="text-sm font-medium">{isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>}
           </button>
           
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+            className="w-full flex items-center gap-4 px-4 py-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
           >
-            <LogOut size={20} />
-            {isSidebarOpen && <span className="font-medium">Cerrar Sesión</span>}
+            <LogOut size={18} />
+            {isSidebarOpen && <span className="text-sm font-medium">Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
