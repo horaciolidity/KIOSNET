@@ -19,6 +19,7 @@ const History: React.FC = () => {
   const { history, fetchHistory } = useCashStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'EGRESO' | 'SISTEMA'>('TODOS');
+  const [filterPeriod, setFilterPeriod] = useState<'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('MES');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -29,7 +30,28 @@ const History: React.FC = () => {
     const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          item.id.includes(searchTerm);
     const matchesType = filterType === 'TODOS' || item.type === filterType;
-    return matchesSearch && matchesType;
+    
+    const itemDate = new Date(item.timestamp);
+    const now = new Date();
+    
+    let matchesPeriod = true;
+    if (filterPeriod === 'HOY') {
+      matchesPeriod = itemDate.toDateString() === now.toDateString();
+    } else if (filterPeriod === 'SEMANA') {
+      const diffTime = Math.abs(now.getTime() - itemDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      matchesPeriod = diffDays <= 7;
+    } else if (filterPeriod === 'QUINCENA') {
+      const diffTime = Math.abs(now.getTime() - itemDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      matchesPeriod = diffDays <= 15;
+    } else if (filterPeriod === 'MES') {
+      const diffTime = Math.abs(now.getTime() - itemDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      matchesPeriod = diffDays <= 30;
+    }
+
+    return matchesSearch && matchesType && matchesPeriod;
   });
 
   const toggleRow = (id: string) => {
@@ -60,6 +82,28 @@ const History: React.FC = () => {
         <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" />
         <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" />
         <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" />
+      </div>
+
+      {/* Period Filter Tabs */}
+      <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-lg">
+        {[
+          { key: 'HOY', label: 'Hoy' },
+          { key: 'SEMANA', label: 'Esta Semana' },
+          { key: 'QUINCENA', label: 'Esta Quincena' },
+          { key: 'MES', label: 'Últimos 30 Días' }
+        ].map((p) => (
+          <button
+            key={p.key}
+            onClick={() => setFilterPeriod(p.key as any)}
+            className={`flex-1 text-center py-2.5 rounded-xl text-xs font-black transition-all ${
+              filterPeriod === p.key
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
       {/* Filters */}

@@ -196,6 +196,18 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
+      // Clean up movements older than 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      try {
+        await supabase
+          .from('CashMovement')
+          .delete()
+          .lt('createdAt', thirtyDaysAgo.toISOString());
+      } catch (err) {
+        console.error('Error cleaning up old cash movements:', err);
+      }
+
       const { data: movements, error } = await supabase
         .from('CashMovement')
         .select(`
