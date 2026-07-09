@@ -27,9 +27,11 @@ export interface CashSession {
 interface CashState {
   session: CashSession;
   history: CashTransaction[];
+  pastRegisters: any[];
   loading: boolean;
   fetchActiveSession: () => Promise<void>;
   fetchHistory: () => Promise<void>;
+  fetchPastRegisters: () => Promise<void>;
   openBox: (amount: number) => Promise<void>;
   closeBox: (amount: number) => Promise<void>;
   addTransaction: (transaction: Omit<CashTransaction, 'id' | 'timestamp'>) => Promise<void>;
@@ -51,7 +53,7 @@ function mapFrontendTypeToDb(type: string, amount: number): 'IN' | 'OUT' {
   return amount >= 0 ? 'IN' : 'OUT';
 }
 
-function mapDbToFrontendType(type: 'IN' | 'OUT', description: string, paymentMethod?: string): {
+export function mapDbToFrontendType(type: 'IN' | 'OUT', description: string, paymentMethod?: string): {
   txType: 'INGRESO' | 'EGRESO' | 'VENTA' | 'SISTEMA' | 'PAGO_DEUDA';
   method: CashTransaction['method'];
 } {
@@ -113,6 +115,7 @@ export const useCashStore = create<CashState>((set, get) => ({
     transactions: []
   },
   history: [],
+  pastRegisters: [],
   loading: false,
 
   fetchActiveSession: async () => {
@@ -246,6 +249,28 @@ export const useCashStore = create<CashState>((set, get) => ({
       });
     } catch (error) {
       console.error('Error fetching cash history from Supabase:', error);
+      set({ loading: false });
+    }
+  },
+
+  fetchPastRegisters: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    set({ loading: true });
+    try {
+      const { data, error } = await supabase
+        .from('CashRegister')
+        .select('*, movements:CashMovement(*)')
+        .eq('tenantId', user.tenantId)
+        .eq('status', 'CLOSED')
+        .order('openedAt', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      set({ pastRegisters: data || [], loading: false });
+    } catch (error) {
+      console.error('Error fetching past registers from Supabase:', error);
       set({ loading: false });
     }
   },

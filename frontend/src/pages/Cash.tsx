@@ -19,7 +19,7 @@ import {
   BookOpen,
   Receipt
 } from 'lucide-react';
-import { useCashStore } from '../store/useCashStore';
+import { useCashStore, mapDbToFrontendType } from '../store/useCashStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 
@@ -40,7 +40,7 @@ const getMethod = (m: string) => METHOD_META[m] ?? METHOD_META['NINGUNO'];
 const Cash: React.FC = () => {
   const { user } = useAuthStore();
   const { security } = useSettingsStore();
-  const { session, openBox, closeBox, addTransaction } = useCashStore();
+  const { session, openBox, closeBox, addTransaction, pastRegisters, fetchPastRegisters } = useCashStore();
 
   React.useEffect(() => {
     useCashStore.getState().fetchActiveSession();
@@ -50,12 +50,20 @@ const Cash: React.FC = () => {
   const [openingAmount, setOpeningAmount] = useState<string>('');
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [showArqueo, setShowArqueo] = useState(false);
+  const [activeTab, setActiveTab] = useState<'MOVIMIENTOS' | 'ARQUEOS'>('MOVIMIENTOS');
+  const [expandedRegisterId, setExpandedRegisterId] = useState<string | null>(null);
   const [txData, setTxData] = useState({
     type: 'INGRESO' as 'INGRESO' | 'EGRESO',
     amount: '',
     description: '',
     method: 'EFECTIVO' as any
   });
+
+  React.useEffect(() => {
+    if (activeTab === 'ARQUEOS') {
+      fetchPastRegisters();
+    }
+  }, [activeTab, fetchPastRegisters]);
 
   // ──────────────────────────────────────────────────────────
   // Detailed financial calculations for the arqueo
@@ -293,103 +301,265 @@ const Cash: React.FC = () => {
         </div>
       )}
 
-      {/* ── Transactions History ── */}
+      {/* ── Transactions & Arqueos History ── */}
       <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center text-slate-900 dark:text-white">
-          <h2 className="text-xl font-black flex items-center gap-2">
-            <HistoryIcon size={24} className="text-blue-600" /> Historial de Movimientos
-          </h2>
-          <span className="text-xs font-black bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500 uppercase">{txs.length} Operaciones</span>
+        <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-slate-900 dark:text-white">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setActiveTab('MOVIMIENTOS')}
+              className={`text-xl font-black flex items-center gap-2 pb-2 border-b-4 transition-all ${
+                activeTab === 'MOVIMIENTOS'
+                ? 'border-blue-600 text-slate-900 dark:text-white'
+                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600'
+              }`}
+            >
+              <HistoryIcon size={24} className={activeTab === 'MOVIMIENTOS' ? 'text-blue-600' : 'text-slate-400'} /> Movimientos del Turno
+            </button>
+            <button
+              onClick={() => setActiveTab('ARQUEOS')}
+              className={`text-xl font-black flex items-center gap-2 pb-2 border-b-4 transition-all ${
+                activeTab === 'ARQUEOS'
+                ? 'border-blue-600 text-slate-900 dark:text-white'
+                : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600'
+              }`}
+            >
+              <BookOpen size={24} className={activeTab === 'ARQUEOS' ? 'text-blue-600' : 'text-slate-400'} /> Historial de Arqueos
+            </button>
+          </div>
+          <span className="text-xs font-black bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500 uppercase">
+            {activeTab === 'MOVIMIENTOS' ? `${txs.length} Operaciones` : `${pastRegisters.length} Arqueos`}
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              <tr>
-                <th className="px-8 py-5">Hora</th>
-                <th className="px-8 py-5">Descripción</th>
-                <th className="px-8 py-5">Medio de Pago</th>
-                {!isEmployee && <th className="px-8 py-5 text-right">Ganancia</th>}
-                <th className="px-8 py-5 text-right">Monto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {txs.length === 0 ? (
+
+        {activeTab === 'MOVIMIENTOS' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                 <tr>
-                  <td colSpan={isEmployee ? 4 : 5} className="px-8 py-20 text-center text-slate-400 font-bold italic">No hay movimientos registrados en este turno</td>
+                  <th className="px-8 py-5">Hora</th>
+                  <th className="px-8 py-5">Descripción</th>
+                  <th className="px-8 py-5">Medio de Pago</th>
+                  {!isEmployee && <th className="px-8 py-5 text-right">Ganancia</th>}
+                  <th className="px-8 py-5 text-right">Monto</th>
                 </tr>
-              ) : (
-                txs.map((tx) => {
-                  const meta = getMethod(tx.method);
-                  return (
-                    <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
-                      <td className="px-8 py-4 text-sm font-bold text-slate-500">
-                        {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="px-8 py-4">
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{tx.description}</p>
-                        <span className={`inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 ${
-                          tx.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10' 
-                          : tx.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
-                          : tx.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
-                          : tx.type === 'SISTEMA' ? 'bg-slate-100 text-slate-400 dark:bg-slate-800'
-                          : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
-                        }`}>
-                          {tx.type === 'PAGO_DEUDA' ? 'Cobro Deuda' : tx.type}
-                        </span>
-                      </td>
-                      <td className="px-8 py-4">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${meta.bg} ${meta.color}`}>
-                          {tx.method === 'EFECTIVO' ? <Banknote size={12}/> 
-                            : tx.method === 'TRANSFERENCIA' ? <SendHorizontal size={12}/> 
-                            : <CreditCard size={12}/>}
-                          {meta.label}
-                        </span>
-                      </td>
-                      {!isEmployee && (
-                        <td className="px-8 py-4 text-right">
-                          {tx.profit ? (
-                            <span className="text-sm font-bold text-indigo-500">+${tx.profit.toLocaleString()}</span>
-                          ) : (
-                            <span className="text-slate-300">-</span>
-                          )}
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {txs.length === 0 ? (
+                  <tr>
+                    <td colSpan={isEmployee ? 4 : 5} className="px-8 py-20 text-center text-slate-400 font-bold italic">No hay movimientos registrados en este turno</td>
+                  </tr>
+                ) : (
+                  txs.map((tx) => {
+                    const meta = getMethod(tx.method);
+                    return (
+                      <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all">
+                        <td className="px-8 py-4 text-sm font-bold text-slate-500">
+                          {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
-                      )}
-                      <td className={`px-8 py-4 text-right font-black text-lg ${tx.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
-                        {tx.type === 'EGRESO' ? '-' : '+'}${tx.amount.toLocaleString()}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-            {txs.length > 0 && (
-              <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-200 dark:border-slate-700">
-                <tr>
-                  <td colSpan={isEmployee ? 2 : 2} className="px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-400">Resumen del Turno</td>
-                  <td className="px-8 py-4">
-                    <div className="flex flex-col gap-1 text-xs font-bold">
-                      <span className="text-emerald-600">${salesCash.toLocaleString()} efectivo</span>
-                      {totalTransfers > 0 && <span className="text-blue-600">${totalTransfers.toLocaleString()} transf.</span>}
-                      {totalDebit > 0 && <span className="text-violet-600">${totalDebit.toLocaleString()} débito</span>}
-                      {totalCredit > 0 && <span className="text-pink-600">${totalCredit.toLocaleString()} crédito</span>}
-                    </div>
-                  </td>
-                  {!isEmployee && (
-                    <td className="px-8 py-4 text-right font-bold text-indigo-500 text-sm">
-                      +${totalProfits.toLocaleString()}
+                        <td className="px-8 py-4">
+                          <p className="font-bold text-slate-900 dark:text-white text-sm">{tx.description}</p>
+                          <span className={`inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 ${
+                            tx.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10' 
+                            : tx.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
+                            : tx.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
+                            : tx.type === 'SISTEMA' ? 'bg-slate-100 text-slate-400 dark:bg-slate-800'
+                            : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
+                          }`}>
+                            {tx.type === 'PAGO_DEUDA' ? 'Cobro Deuda' : tx.type}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${meta.bg} ${meta.color}`}>
+                            {tx.method === 'EFECTIVO' ? <Banknote size={12}/> 
+                              : tx.method === 'TRANSFERENCIA' ? <SendHorizontal size={12}/> 
+                              : <CreditCard size={12}/>}
+                            {meta.label}
+                          </span>
+                        </td>
+                        {!isEmployee && (
+                          <td className="px-8 py-4 text-right">
+                            {tx.profit ? (
+                              <span className="text-sm font-bold text-indigo-500">+${tx.profit.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
+                          </td>
+                        )}
+                        <td className={`px-8 py-4 text-right font-black text-lg ${tx.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
+                          {tx.type === 'EGRESO' ? '-' : '+'}${tx.amount.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              {txs.length > 0 && (
+                <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <td colSpan={isEmployee ? 2 : 2} className="px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-400">Resumen del Turno</td>
+                    <td className="px-8 py-4">
+                      <div className="flex flex-col gap-1 text-xs font-bold">
+                        <span className="text-emerald-600">${salesCash.toLocaleString()} efectivo</span>
+                        {totalTransfers > 0 && <span className="text-blue-600">${totalTransfers.toLocaleString()} transf.</span>}
+                        {totalDebit > 0 && <span className="text-violet-600">${totalDebit.toLocaleString()} débito</span>}
+                        {totalCredit > 0 && <span className="text-pink-600">${totalCredit.toLocaleString()} crédito</span>}
+                      </div>
                     </td>
-                  )}
-                  <td className="px-8 py-4 text-right">
-                    <div className="space-y-1">
-                      <p className="text-emerald-600 font-black text-lg">${(totalSales + manualIncomes + debtPayments).toLocaleString()}</p>
-                      <p className="text-red-500 font-bold text-xs">-${totalExpenses.toLocaleString()} egresos</p>
+                    {!isEmployee && (
+                      <td className="px-8 py-4 text-right font-bold text-indigo-500 text-sm">
+                        +${totalProfits.toLocaleString()}
+                      </td>
+                    )}
+                    <td className="px-8 py-4 text-right">
+                      <div className="space-y-1">
+                        <p className="text-emerald-600 font-black text-lg">${(totalSales + manualIncomes + debtPayments).toLocaleString()}</p>
+                        <p className="text-red-500 font-bold text-xs">-${totalExpenses.toLocaleString()} egresos</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 space-y-6">
+            {pastRegisters.length === 0 ? (
+              <p className="text-center py-20 text-slate-400 font-bold italic">No hay arqueos cerrados registrados</p>
+            ) : (
+              <div className="space-y-4">
+                {pastRegisters.map((reg: any) => {
+                  const isExpanded = expandedRegisterId === reg.id;
+                  const duration = reg.closedAt && reg.openedAt 
+                    ? Math.round((new Date(reg.closedAt).getTime() - new Date(reg.openedAt).getTime()) / (1000 * 60)) 
+                    : 0;
+                  const durationText = duration > 60 
+                    ? `${Math.floor(duration / 60)}h ${duration % 60}m` 
+                    : `${duration}m`;
+
+                  // Calculate actual cash balance vs expected
+                  const regTxs = reg.movements || [];
+                  const mappedRegTxs = regTxs.map((m: any) => {
+                    const { txType, method } = mapDbToFrontendType(m.type, m.description, m.paymentMethod);
+                    return {
+                      id: m.id,
+                      type: txType,
+                      amount: m.amount,
+                      method,
+                      description: m.description,
+                      timestamp: m.createdAt,
+                      profit: m.profit
+                    };
+                  });
+                  const cashSales = mappedRegTxs.filter((t: any) => t.type === 'VENTA' && t.method === 'EFECTIVO').reduce((s: number, t: any) => s + t.amount, 0);
+                  const manualIncomes = mappedRegTxs.filter((t: any) => t.type === 'INGRESO' && t.method === 'EFECTIVO').reduce((s: number, t: any) => s + t.amount, 0);
+                  const debtPayments = mappedRegTxs.filter((t: any) => t.type === 'PAGO_DEUDA' && t.method === 'EFECTIVO').reduce((s: number, t: any) => s + t.amount, 0);
+                  const totalExpenses = mappedRegTxs.filter((t: any) => t.type === 'EGRESO').reduce((s: number, t: any) => s + t.amount, 0);
+                  const expectedCash = reg.openingBalance + cashSales + manualIncomes + debtPayments - totalExpenses;
+                  const difference = reg.closingBalance - expectedCash;
+
+                  return (
+                    <div key={reg.id} className="border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 transition-all">
+                      <div 
+                        onClick={() => setExpandedRegisterId(isExpanded ? null : reg.id)}
+                        className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-all"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                            Arqueo del {new Date(reg.openedAt).toLocaleDateString()}
+                            <span className="text-[10px] font-black bg-emerald-500/10 text-emerald-600 px-2.5 py-1 rounded-md uppercase">
+                              Cerrado
+                            </span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-bold">
+                            <span className="flex items-center gap-1"><Clock size={12}/> {new Date(reg.openedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} a {reg.closedAt ? new Date(reg.closedAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'} ({durationText})</span>
+                            <span>•</span>
+                            <span>Usuario ID: {reg.userId.substring(0,8)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Inicio / Esperado</p>
+                            <p className="font-bold text-slate-600 dark:text-slate-400 text-sm">${reg.openingBalance.toLocaleString()} / ${expectedCash.toLocaleString()}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cierre Real</p>
+                            <p className="font-black text-slate-950 dark:text-white text-base">${reg.closingBalance.toLocaleString()}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Diferencia</p>
+                            <p className={`font-black text-sm ${difference === 0 ? 'text-slate-500' : difference > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                              {difference > 0 ? '+' : ''}${difference.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-slate-400 pl-2">
+                            {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/30 p-6 overflow-x-auto animate-in slide-in-from-top-4 duration-200">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Movimientos de este Turno ({mappedRegTxs.length})</p>
+                          <table className="w-full text-left">
+                            <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                              <tr>
+                                <th className="px-4 py-3">Hora</th>
+                                <th className="px-4 py-3">Descripción</th>
+                                <th className="px-4 py-3">Medio de Pago</th>
+                                <th className="px-4 py-3 text-right">Monto</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                              {mappedRegTxs.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-bold italic text-xs">No se registraron movimientos en este turno</td>
+                                </tr>
+                              ) : (
+                                mappedRegTxs.map((t: any) => {
+                                  const tMeta = getMethod(t.method);
+                                  return (
+                                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
+                                      <td className="px-4 py-3.5 text-xs text-slate-500 font-bold">
+                                        {new Date(t.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <p className="font-bold text-slate-900 dark:text-white text-xs">{t.description}</p>
+                                        <span className={`inline-block text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 ${
+                                          t.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10'
+                                          : t.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
+                                          : t.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
+                                          : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
+                                        }`}>
+                                          {t.type}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${tMeta.bg} ${tMeta.color}`}>
+                                          {t.method === 'EFECTIVO' ? <Banknote size={10}/> 
+                                            : t.method === 'TRANSFERENCIA' ? <SendHorizontal size={10}/> 
+                                            : <CreditCard size={10}/>}
+                                          {tMeta.label}
+                                        </span>
+                                      </td>
+                                      <td className={`px-4 py-3.5 text-right font-black text-sm ${t.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                        {t.type === 'EGRESO' ? '-' : '+'}${t.amount.toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              </tfoot>
+                  );
+                })}
+              </div>
             )}
-          </table>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ── New Transaction Modal ── */}
