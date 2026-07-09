@@ -398,7 +398,16 @@ const HardwareTips = ({ hardwareLinks }: { hardwareLinks: { link_scanner: string
               <span className="text-[10px] font-black text-amber-500 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
                 ⭐ Exclusivo PRO
               </span>
-              <a href="/display" target="_blank" rel="noopener noreferrer" className="text-xs font-black text-blue-600 hover:underline">
+              <a 
+                href="/display" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open('/display', 'CustomerDisplay', 'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no');
+                }}
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-xs font-black text-blue-600 hover:underline"
+              >
                 Abrir Pantalla →
               </a>
             </div>

@@ -352,10 +352,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <nav className="flex-1 overflow-y-auto px-4 space-y-2 mt-4 scrollbar-hide">
           {menuItems.map((item) => {
             if (item.external) {
+              const handleExternalClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                if (item.path === '/display') {
+                  e.preventDefault();
+                  window.open('/display', 'CustomerDisplay', 'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no');
+                }
+              };
               return (
                 <a
                   key={item.path}
                   href={item.path}
+                  onClick={handleExternalClick}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all group text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
