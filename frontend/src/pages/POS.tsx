@@ -67,6 +67,7 @@ const POS: React.FC = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [isWaitingForMP, setIsWaitingForMP] = useState(false);
   const [mpInitPoint, setMpInitPoint] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
 
   const filteredProducts = products.filter(p => {
@@ -298,10 +299,14 @@ const POS: React.FC = () => {
     } catch (error: any) {
       console.error('Error finalizando la venta:', error);
       alert(`Hubo un error al procesar la venta: ${error.message || 'Error inesperado'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleFinishSale = async () => {
+    if (isSubmitting) return;
+
     if (paymentMethod === 'CUENTA_CORRIENTE' && !selectedCustomerId) {
       alert('Debes seleccionar un cliente para cobrar con Cuenta Corriente.');
       return;
@@ -311,6 +316,8 @@ const POS: React.FC = () => {
       alert('Debe iniciar sesión para realizar ventas.');
       return;
     }
+
+    setIsSubmitting(true);
 
     if (paymentMethod === 'MERCADOPAGO') {
       setIsWaitingForMP(true);
@@ -361,6 +368,7 @@ const POS: React.FC = () => {
         const initPoint = mpResponse.data.init_point;
         setSaleId(pendingSaleId);
         setMpInitPoint(initPoint);
+        setIsSubmitting(false);
 
         // 3. Poll Mercado Pago API directly to check if the payment is approved
         const pollInterval = setInterval(async () => {
@@ -455,6 +463,7 @@ const POS: React.FC = () => {
         console.error('Error starting Mercado Pago transaction:', error);
         alert('Hubo un error al conectar con Mercado Pago. Intente nuevamente.');
         setIsWaitingForMP(false);
+        setIsSubmitting(false);
       }
     } else {
       finalizeTransaction();
@@ -930,7 +939,9 @@ const POS: React.FC = () => {
                       <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center"><span className="text-lg font-black text-slate-900 dark:text-white leading-none">A PAGAR</span><span className="text-3xl font-black text-blue-600">${total.toLocaleString()}</span></div>
                     </div>
                   </div>
-                  <button onClick={handleFinishSale} disabled={paymentMethod === 'EFECTIVO' && (Number(amountPaid) < total)} className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">CONFIRMAR</button>
+                  <button onClick={handleFinishSale} disabled={isSubmitting || (paymentMethod === 'EFECTIVO' && (Number(amountPaid) < total))} className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                    {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR'}
+                  </button>
                 </div>
               </>
             ) : isWaitingForMP ? (
