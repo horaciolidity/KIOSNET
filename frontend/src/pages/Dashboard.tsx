@@ -19,13 +19,15 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useCashStore } from '../store/useCashStore';
+import { useCustomerStore } from '../store/useCustomerStore';
 import { supabase } from '../utils/supabaseClient';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
   const { businessInfo } = useSettingsStore();
-  const { products } = useInventoryStore();
-  const { history, fetchHistory } = useCashStore();
+  const { products, loading: inventoryLoading } = useInventoryStore();
+  const { history, fetchHistory, loading: cashLoading } = useCashStore();
+  const { customers, loading: customerLoading } = useCustomerStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,6 +73,7 @@ const Dashboard: React.FC = () => {
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
   const salesToday = history.filter(t => t.type === 'VENTA').reduce((s, t) => s + t.amount, 0);
+  const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
   
   // Real Database Subscription Details
   const activePlan = user?.subActive ? user?.plan : 'FREE';
@@ -159,11 +162,11 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
         <StatCard title="Ventas Hoy" value={`$${salesToday.toLocaleString()}`} icon={<DollarSign className="w-6 h-6 text-blue-600" />} color="blue" />
         <StatCard title="Productos" value={products.length.toString()} icon={<Package className="w-6 h-6 text-emerald-600" />} color="emerald" />
         <StatCard title="Stock Bajo" value={lowStockCount.toString()} icon={<AlertTriangle className="w-6 h-6 text-orange-600" />} color="orange" />
-        <StatCard title="Clientes" value="0" icon={<Users className="w-6 h-6 text-indigo-600" />} color="indigo" />
+        <StatCard title="Clientes" value={customers.length.toString()} icon={<Users className="w-6 h-6 text-indigo-600" />} color="indigo" />
       </div>
 
       {/* Hardware Tips Banner */}
