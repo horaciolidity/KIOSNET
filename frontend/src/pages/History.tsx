@@ -16,7 +16,7 @@ import {
 import { useCashStore } from '../store/useCashStore';
 
 const History: React.FC = () => {
-  const { history, fetchHistory } = useCashStore();
+  const { history, fetchHistory, loading } = useCashStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'EGRESO' | 'SISTEMA'>('TODOS');
   const [filterPeriod, setFilterPeriod] = useState<'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('MES');
@@ -67,6 +67,11 @@ const History: React.FC = () => {
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
             Historial de Operaciones <HistoryIcon className="text-blue-600" />
+            {loading && (
+              <span className="text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-500/10 px-3 py-1 rounded-full animate-pulse">
+                Actualizando...
+              </span>
+            )}
           </h1>
           <p className="text-slate-500 font-medium">Registro detallado de todos los movimientos del sistema.</p>
         </div>
@@ -78,7 +83,7 @@ const History: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300 ${loading ? 'opacity-60 animate-pulse pointer-events-none' : ''}`}>
         <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" />
         <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" />
         <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" />
@@ -136,7 +141,7 @@ const History: React.FC = () => {
       </div>
 
       {/* Main History Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className={`bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-300 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">

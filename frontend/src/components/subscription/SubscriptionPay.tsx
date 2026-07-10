@@ -36,7 +36,8 @@ const SubscriptionPay: React.FC = () => {
     // Strategy 1: Direct payment lookup if we have paymentId
     if (paymentId) {
       try {
-        const pResponse = await axios.get(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        const targetUrl = `https://api.mercadopago.com/v1/payments/${paymentId}`;
+        const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
         const paymentInfo = pResponse.data;
@@ -55,7 +56,8 @@ const SubscriptionPay: React.FC = () => {
     if (!approvedPaymentFound) {
       const ref = `sub_${plan}_${tenantId}_${months}`;
       try {
-        const searchResponse = await axios.get(`https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`, {
+        const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`;
+        const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
         const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');

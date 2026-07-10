@@ -281,6 +281,23 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
+      // Check if there is already an open register for this tenant
+      const { data: existingReg, error: checkError } = await supabase
+        .from('CashRegister')
+        .select('id')
+        .eq('tenantId', user.tenantId)
+        .eq('status', 'OPEN')
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existingReg && existingReg.length > 0) {
+        alert('Ya existe una caja abierta para este comercio en otro dispositivo o pestaña. Por favor, ciérrala antes de abrir una nueva.');
+        set({ loading: false });
+        get().fetchActiveSession();
+        return;
+      }
+
       const { data: reg, error: regError } = await supabase
         .from('CashRegister')
         .insert({

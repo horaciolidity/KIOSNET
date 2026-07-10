@@ -373,8 +373,9 @@ const POS: React.FC = () => {
         // 3. Poll Mercado Pago API directly to check if the payment is approved
         const pollInterval = setInterval(async () => {
           try {
+            const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${pendingSaleId}`;
             const mpSearchResponse = await axios.get(
-              `https://api.mercadopago.com/v1/payments/search?external_reference=${pendingSaleId}`,
+              `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
               {
                 headers: {
                   Authorization: `Bearer ${token}`
