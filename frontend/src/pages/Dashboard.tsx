@@ -72,7 +72,14 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
-  const salesToday = history.filter(t => t.type === 'VENTA').reduce((s, t) => s + t.amount, 0);
+  const salesToday = history.filter(t => {
+    if (t.type !== 'VENTA') return false;
+    const date = new Date(t.timestamp);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  }).reduce((s, t) => s + t.amount, 0);
   const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
   
   // Real Database Subscription Details
