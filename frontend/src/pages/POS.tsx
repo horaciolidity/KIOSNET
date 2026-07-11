@@ -988,7 +988,7 @@ const POS: React.FC = () => {
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-8 animate-in zoom-in-95 duration-300 overflow-y-auto">
                 <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20"><CheckCircle2 size={48} /></div>
                 <div><h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">¡Venta Exitosa!</h2><p className="text-slate-500 font-medium">La transacción se ha registrado correctamente.</p></div>
-                <div className="w-full max-w-[320px] bg-slate-50 dark:bg-slate-800 p-6 rounded-[32px] border border-dashed border-slate-300 dark:border-slate-700 font-mono text-left text-xs text-slate-600 dark:text-slate-400 space-y-4">
+                <div className="w-full max-w-[320px] max-h-[250px] overflow-y-auto bg-slate-50 dark:bg-slate-800 p-6 rounded-[32px] border border-dashed border-slate-300 dark:border-slate-700 font-mono text-left text-xs text-slate-600 dark:text-slate-400 space-y-4">
                   <div className="text-center border-b border-dashed border-slate-300 dark:border-slate-700 pb-4">
                     <p className="font-black text-slate-900 dark:text-white text-base uppercase">{businessInfo?.name || 'Comercio'}</p>
                     <p>{businessInfo?.address}</p>
