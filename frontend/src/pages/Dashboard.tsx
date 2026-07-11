@@ -74,11 +74,13 @@ const Dashboard: React.FC = () => {
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
   const salesToday = history.filter(t => {
     if (t.type !== 'VENTA') return false;
-    const date = new Date(t.timestamp);
-    const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
+    try {
+      const dateStr = new Date(t.timestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const todayStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      return dateStr === todayStr;
+    } catch (e) {
+      return false;
+    }
   }).reduce((s, t) => s + t.amount, 0);
   const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
   
