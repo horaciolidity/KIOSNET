@@ -173,7 +173,7 @@ const Cash: React.FC = () => {
             <div className="flex items-center gap-1"><Receipt size={14}/> {saleCount} VENTA{saleCount !== 1 ? 'S' : ''}</div>
           </div>
         </div>
-        <div className="flex gap-3 w-full md:w-auto flex-wrap">
+        <div className="flex gap-3 w-full md:w-auto flex-wrap" id="tour-cash-actions">
           <button 
             onClick={() => setIsTxModalOpen(true)}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl"

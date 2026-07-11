@@ -205,6 +205,7 @@ const Inventory: React.FC = () => {
               </button>
             </div>
             <button 
+              id="tour-inv-add"
               onClick={openAddModal}
               className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
             >

@@ -557,7 +557,7 @@ const POS: React.FC = () => {
         )}
 
         <div className="p-6 space-y-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="relative">
+          <div className="relative" id="tour-pos-scanner">
             <Search className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
             <input 
               type="text" 
@@ -571,7 +571,7 @@ const POS: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="tour-pos-categories">
             <CategoryTab 
               label="Todos" 
               active={selectedCategory === 'Todos'} 
@@ -633,7 +633,7 @@ const POS: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3" id="tour-pos-cart">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 space-y-4">
               <ShoppingCart size={64} strokeWidth={1} />
@@ -719,6 +719,7 @@ const POS: React.FC = () => {
             </button>
           ) : (
             <button 
+              id="tour-pos-cobrar"
               disabled={cart.length === 0}
               onClick={() => setIsCheckoutOpen(true)}
               className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50"

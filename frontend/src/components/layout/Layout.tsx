@@ -18,11 +18,14 @@ import {
   X,
   Lock,
   Unlock,
-  Crown
+  Crown,
+  HelpCircle
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useThemeStore } from '../../store/useThemeStore';
+import { useTourStore } from '../../store/useTourStore';
+import { TourOverlay } from '../tour/TourOverlay';
 import { supabase } from '../../utils/supabaseClient';
 import axios from 'axios';
 
@@ -38,6 +41,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { user, logout, token, setAuth, fetchUserSession } = useAuthStore();
   const { businessInfo } = useSettingsStore();
+  const { active: tourActive, startTour } = useTourStore();
+
+  // Auto-start tour for new users on mount
+  useEffect(() => {
+    const onboardingCompleted = localStorage.getItem('kiosnet_onboarding_completed');
+    if (!onboardingCompleted && user) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, startTour]);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -351,7 +366,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 space-y-2 mt-4 scrollbar-hide">
+        <nav id="tour-sidebar-menu" className="flex-1 overflow-y-auto px-4 space-y-2 mt-4 scrollbar-hide">
           {menuItems.map((item) => {
             if (item.external) {
               const handleExternalClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -721,6 +736,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       )}
+
+      {/* Floating Tour Guide Trigger Button */}
+      {!tourActive && (
+        <button 
+          onClick={startTour}
+          className="fixed bottom-6 right-6 z-[90] bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 flex items-center justify-center group cursor-pointer"
+          title="Iniciar tutorial interactivo"
+        >
+          <HelpCircle size={24} className="animate-pulse" />
+          <span className="max-w-0 overflow-hidden group-hover:max-w-[150px] group-hover:ml-2 font-black text-xs uppercase tracking-wider transition-all duration-300 whitespace-nowrap">
+            Asistente
+          </span>
+        </button>
+      )}
+      
+      {/* Interactive Tour Overlay */}
+      <TourOverlay />
     </div>
   );
 };

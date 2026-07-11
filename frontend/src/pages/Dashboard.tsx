@@ -106,7 +106,7 @@ const Dashboard: React.FC = () => {
           <h1 className="text-4xl font-black text-slate-900 dark:text-white">Panel de Control</h1>
           <p className="text-slate-500 font-medium">Bienvenido a {businessInfo?.name || 'tu Comercio'}.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4" id="tour-dashboard-license">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-[24px] border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
             <div className="text-right">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Plan Actual</p>
@@ -171,7 +171,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
+      <div id="tour-dashboard-stats" className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
         <StatCard title="Ventas Hoy" value={`$${salesToday.toLocaleString()}`} icon={<DollarSign className="w-6 h-6 text-blue-600" />} color="blue" />
         <StatCard title="Productos" value={products.length.toString()} icon={<Package className="w-6 h-6 text-emerald-600" />} color="emerald" />
         <StatCard title="Stock Bajo" value={lowStockCount.toString()} icon={<AlertTriangle className="w-6 h-6 text-orange-600" />} color="orange" />
@@ -179,7 +179,9 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Hardware Tips Banner */}
-      <HardwareTips hardwareLinks={hardwareLinks} />
+      <div id="tour-dashboard-hardware">
+        <HardwareTips hardwareLinks={hardwareLinks} />
+      </div>
 
       {/* Plans Section */}
       <div className="space-y-6">
