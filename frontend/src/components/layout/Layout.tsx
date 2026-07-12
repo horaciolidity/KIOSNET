@@ -25,6 +25,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useTourStore } from '../../store/useTourStore';
+import { useCashStore } from '../../store/useCashStore';
 import { TourOverlay } from '../tour/TourOverlay';
 import { supabase } from '../../utils/supabaseClient';
 import axios from 'axios';
@@ -41,22 +42,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { user, logout, token, setAuth, fetchUserSession } = useAuthStore();
   const { businessInfo } = useSettingsStore();
-  const { active: tourActive, startTour } = useTourStore();
+  const { active: tourActive, startTourForRoute } = useTourStore();
 
-  // Auto-start tour for new users on mount
+  // Auto-start tour for the current route if never completed
   useEffect(() => {
     if (user) {
-      const onboardingCompletedLocal = localStorage.getItem(`kiosnet_onboarding_completed_${user.id}`) === 'true';
-      const onboardingCompletedDb = user.onboardingCompleted === true;
+      const currentRoute = location.pathname;
+      const supportedRoutes = ['/dashboard', '/billing', '/pos', '/inventory', '/cash', '/history', '/reports', '/settings', '/display'];
+      if (!supportedRoutes.includes(currentRoute)) return;
 
-      if (!onboardingCompletedLocal && !onboardingCompletedDb && !tourActive) {
+      let storageKey = `kiosnet_tour_completed_${currentRoute}_${user.id}`;
+      if (currentRoute === '/cash') {
+        const isRegisterOpen = useCashStore.getState().session.isOpen;
+        storageKey = `kiosnet_tour_completed_/cash_${isRegisterOpen ? 'open' : 'closed'}_${user.id}`;
+      }
+      const tourCompleted = localStorage.getItem(storageKey) === 'true';
+
+      if (!tourCompleted && !tourActive) {
         const timer = setTimeout(() => {
-          startTour();
+          startTourForRoute(currentRoute);
         }, 1500);
         return () => clearTimeout(timer);
       }
     }
-  }, [user, startTour, tourActive]);
+  }, [user, location.pathname, startTourForRoute, tourActive]);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -744,7 +753,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Floating Tour Guide Trigger Button */}
       {!tourActive && (
         <button 
-          onClick={startTour}
+          onClick={() => startTourForRoute(location.pathname)}
           className="fixed bottom-6 right-6 z-[90] bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 flex items-center justify-center group cursor-pointer"
           title="Iniciar tutorial interactivo"
         >

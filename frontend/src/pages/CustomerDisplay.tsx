@@ -38,7 +38,7 @@ const CustomerDisplay: React.FC = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-slate-900 text-white p-8 flex flex-col">
+    <div id="tour-display-main" className="relative min-h-screen bg-slate-900 text-white p-8 flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>

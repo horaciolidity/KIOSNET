@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTourStore } from '../../store/useTourStore';
 import { ChevronLeft, ChevronRight, X, Sparkles } from 'lucide-react';
 
 export const TourOverlay: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { active, stepIndex, steps, nextStep, prevStep, endTour } = useTourStore();
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
@@ -13,12 +12,12 @@ export const TourOverlay: React.FC = () => {
 
   const currentStep = steps[stepIndex];
 
-  // Sync page route when tour step changes
+  // End tour if route changes
   useEffect(() => {
     if (active && currentStep && location.pathname !== currentStep.route) {
-      navigate(currentStep.route);
+      endTour();
     }
-  }, [active, currentStep, location.pathname, navigate]);
+  }, [active, currentStep, location.pathname, endTour]);
 
   // Calculate target element position
   useEffect(() => {

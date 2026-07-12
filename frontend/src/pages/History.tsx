@@ -83,14 +83,14 @@ const History: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300 ${loading ? 'opacity-60 animate-pulse pointer-events-none' : ''}`}>
+      <div id="tour-hist-summary" className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300 ${loading ? 'opacity-60 animate-pulse pointer-events-none' : ''}`}>
         <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" />
         <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" />
         <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" />
       </div>
 
       {/* Period Filter Tabs */}
-      <div className="flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-lg">
+      <div id="tour-hist-period" className="flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-lg">
         {[
           { key: 'HOY', label: 'Hoy' },
           { key: 'SEMANA', label: 'Esta Semana' },
@@ -112,7 +112,7 @@ const History: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4">
+      <div id="tour-hist-search" className="bg-white dark:bg-slate-900 p-6 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
           <input 
@@ -141,7 +141,7 @@ const History: React.FC = () => {
       </div>
 
       {/* Main History Table */}
-      <div className={`bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-300 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
+      <div id="tour-hist-table" className={`bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-all duration-300 ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">

@@ -136,6 +136,7 @@ const Cash: React.FC = () => {
               <div className="relative">
                 <span className="absolute left-6 top-5 text-slate-400 font-black text-xl">$</span>
                 <input 
+                  id="tour-cash-open-input"
                   type="number"
                   required
                   placeholder="0.00"
@@ -147,6 +148,7 @@ const Cash: React.FC = () => {
               </div>
             </div>
             <button 
+              id="tour-cash-open-btn"
               type="submit"
               className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-600/20 active:scale-95 transition-all"
             >
@@ -196,7 +198,7 @@ const Cash: React.FC = () => {
       </div>
 
       {/* ── Top Stats Grid ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div id="tour-cash-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Efectivo en Caja" 
           amount={session.currentBalance} 
@@ -232,7 +234,7 @@ const Cash: React.FC = () => {
       {/* ── Payment Method Cards (detailed breakdown) ── */}
       <div>
         <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Recaudación por Medio de Pago</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div id="tour-cash-payments" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <PaymentCard title="Efectivo"       amount={salesCash}     icon={<Banknote size={22}/>}       colorKey="EFECTIVO" />
           <PaymentCard title="Transferencia"  amount={totalTransfers} icon={<SendHorizontal size={22}/>} colorKey="TRANSFERENCIA" />
           <PaymentCard title="Débito"         amount={totalDebit}    icon={<CreditCard size={22}/>}     colorKey="DEBITO" />
