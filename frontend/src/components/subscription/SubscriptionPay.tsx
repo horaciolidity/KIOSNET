@@ -458,7 +458,7 @@ const SubscriptionPay: React.FC = () => {
         )}
 
         {!paymentOpened ? (
-          <div className="grid md:grid-cols-2 gap-8">
+          <div id="tour-sub-plans" className="grid md:grid-cols-2 gap-8">
             
             {/* Standard Plan Card */}
             <div 
@@ -594,7 +594,7 @@ const SubscriptionPay: React.FC = () => {
               }
 
               return (
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div id="tour-sub-months" className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-left">
                     <h4 className="text-white font-medium">Duración de la suscripción</h4>
                     <p className="text-slate-400 text-sm">Paga más meses juntos y asegura tu acceso</p>
@@ -625,7 +625,7 @@ const SubscriptionPay: React.FC = () => {
               );
             })()}
 
-            <div className="bg-slate-900/50 rounded-2xl p-4 border border-white/10 flex justify-between items-center text-left">
+            <div id="tour-sub-total" className="bg-slate-900/50 rounded-2xl p-4 border border-white/10 flex justify-between items-center text-left">
               <div>
                 <p className="text-slate-400 text-sm">Total a pagar</p>
                 {(() => {
@@ -669,7 +669,7 @@ const SubscriptionPay: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div id="tour-sub-pay" className="space-y-4">
               <button
                 onClick={handlePaySubscription}
                 disabled={loading || qrLoading}
@@ -704,7 +704,7 @@ const SubscriptionPay: React.FC = () => {
             </div>
 
             {/* Notificar pago manual (para transferencias bancarias o si MP no confirma) */}
-            <div className="mt-2 p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-3">
+            <div id="tour-sub-notify" className="mt-2 p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-3">
               <div className="text-left">
                 <p className="text-amber-400 font-bold text-sm flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />

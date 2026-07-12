@@ -18,7 +18,6 @@ interface TourState {
   nextStep: () => void;
   prevStep: () => void;
   endTour: () => void;
-  setStepsForRoute: (pathname: string) => void;
 }
 
 const ALL_STEPS: TourStep[] = [
@@ -50,6 +49,43 @@ const ALL_STEPS: TourStep[] = [
     description: 'KIOSNET ya está programado para conectarse con lectores de código de barra, ticketeras térmicas y pantallas secundarias sin configurar nada.',
     placement: 'top',
     route: '/dashboard'
+  },
+
+  // Billing / Suscripciones Steps
+  {
+    targetId: 'tour-sub-plans',
+    title: 'Selección de Planes',
+    description: 'Elige entre el Plan Estándar (ventas normales) o el Plan Pro (sincronización multiusuario y ventas ilimitadas).',
+    placement: 'bottom',
+    route: '/billing'
+  },
+  {
+    targetId: 'tour-sub-months',
+    title: 'Duración y Bonificaciones',
+    description: 'Elige por cuántos meses quieres contratar. Contratar 12 meses te otorga 2 meses de regalo (pagas 10).',
+    placement: 'top',
+    route: '/billing'
+  },
+  {
+    targetId: 'tour-sub-total',
+    title: 'Total a Pagar',
+    description: 'Visualiza el monto total final en Pesos Argentinos consolidando promociones vigentes.',
+    placement: 'top',
+    route: '/billing'
+  },
+  {
+    targetId: 'tour-sub-pay',
+    title: 'Medios de Pago',
+    description: 'Paga de forma segura e inmediata usando tu tarjeta de crédito o escaneando el código QR con Mercado Pago.',
+    placement: 'top',
+    route: '/billing'
+  },
+  {
+    targetId: 'tour-sub-notify',
+    title: 'Notificar Transferencias',
+    description: 'Si realizas una transferencia bancaria o necesitas asistencia manual, puedes notificar directamente al administrador desde aquí.',
+    placement: 'top',
+    route: '/billing'
   },
 
   // POS Steps
@@ -84,10 +120,24 @@ const ALL_STEPS: TourStep[] = [
 
   // Inventory Steps
   {
+    targetId: 'tour-inv-search',
+    title: 'Buscador y Filtros',
+    description: 'Busca productos por su nombre o código de barras, y aplica filtros rápidos para controlar tu stock.',
+    placement: 'bottom',
+    route: '/inventory'
+  },
+  {
     targetId: 'tour-inv-add',
     title: 'Agregar Nuevo Producto',
     description: 'Haz clic aquí para dar de alta un producto en tu catálogo, configurar su precio de costo, venta y stock mínimo de alerta.',
     placement: 'bottom',
+    route: '/inventory'
+  },
+  {
+    targetId: 'tour-inv-table',
+    title: 'Lista de Productos',
+    description: 'Administra tus precios, stocks, unidades y categorías. También puedes editar o eliminar artículos.',
+    placement: 'top',
     route: '/inventory'
   },
 
@@ -98,6 +148,29 @@ const ALL_STEPS: TourStep[] = [
     description: 'Abre la caja inicializando el saldo, registra ingresos o retiros manuales de efectivo, y realiza arqueos detallados al final del día.',
     placement: 'bottom',
     route: '/cash'
+  },
+
+  // Reports Steps
+  {
+    targetId: 'tour-reports-stats',
+    title: 'Indicadores de Negocio',
+    description: 'Analiza de un vistazo las ventas totales, gastos, ganancias reales y cantidad de operaciones.',
+    placement: 'bottom',
+    route: '/reports'
+  },
+  {
+    targetId: 'tour-reports-chart',
+    title: 'Gráfico de Rendimiento',
+    description: 'Compara visualmente tus flujos de ingresos frente a las ganancias netas del negocio a lo largo del tiempo.',
+    placement: 'top',
+    route: '/reports'
+  },
+  {
+    targetId: 'tour-reports-categories',
+    title: 'Ventas por Categoría',
+    description: 'Observa la distribución en gráfico de torta de los rubros que más ingresos te generan.',
+    placement: 'left',
+    route: '/reports'
   }
 ];
 
@@ -107,14 +180,7 @@ export const useTourStore = create<TourState>((set, get) => ({
   steps: [],
 
   startTour: () => {
-    // If starting manually or first time
-    set({ active: true, stepIndex: 0 });
-  },
-
-  setStepsForRoute: (pathname: string) => {
-    // Filter steps that match the current route
-    const filteredSteps = ALL_STEPS.filter(step => step.route === pathname);
-    set({ steps: filteredSteps, stepIndex: 0 });
+    set({ active: true, stepIndex: 0, steps: ALL_STEPS });
   },
 
   nextStep: () => {

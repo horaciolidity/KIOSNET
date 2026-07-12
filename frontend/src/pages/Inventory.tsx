@@ -217,7 +217,7 @@ const Inventory: React.FC = () => {
 
       {/* Search & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-4">
+        <div id="tour-inv-search" className="lg:col-span-3 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-3 w-5 h-5 text-slate-400" />
             <input 
@@ -259,7 +259,7 @@ const Inventory: React.FC = () => {
       </div>
 
       {/* Products Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div id="tour-inv-table" className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs font-black uppercase tracking-widest">

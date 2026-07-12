@@ -112,7 +112,7 @@ const Reports: React.FC = () => {
       </div>
 
       {/* High Level Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="tour-reports-stats" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <ReportStatCard 
           title="Ventas Totales" 
           value={`$${stats.totalSales.toLocaleString()}`} 
@@ -149,7 +149,7 @@ const Reports: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Sales Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div id="tour-reports-chart" className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-xl font-black text-slate-900 dark:text-white">Flujo de Ventas vs Ganancias</h3>
             <div className="flex gap-4">
@@ -190,7 +190,7 @@ const Reports: React.FC = () => {
         </div>
 
         {/* Categories Pie Chart */}
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col">
+        <div id="tour-reports-categories" className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col">
           <h3 className="text-xl font-black text-slate-900 dark:text-white mb-8">Ventas por Categoría</h3>
           <div className="flex-1 min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
