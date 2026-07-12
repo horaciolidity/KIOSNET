@@ -72,7 +72,7 @@ const Settings: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Navigation Sidebar */}
-        <div className="space-y-3">
+        <div id="tour-settings-nav" className="space-y-3">
           <NavButton 
             icon={<Store size={20} />} 
             title="Mi Comercio" 
@@ -115,7 +115,7 @@ const Settings: React.FC = () => {
               <p className="font-medium text-lg">Selecciona una categoría para configurar</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div id="tour-settings-content" className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
               <div className="p-8 space-y-8">
                 {activeSection === 'business' && (
                   <div className="space-y-6">

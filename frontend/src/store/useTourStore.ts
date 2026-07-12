@@ -171,6 +171,22 @@ const ALL_STEPS: TourStep[] = [
     description: 'Observa la distribución en gráfico de torta de los rubros que más ingresos te generan.',
     placement: 'left',
     route: '/reports'
+  },
+
+  // Settings Steps
+  {
+    targetId: 'tour-settings-nav',
+    title: 'Navegación de Ajustes',
+    description: 'Navega por las categorías: datos del comercio, alertas de stock, display de cliente y opciones de seguridad.',
+    placement: 'right',
+    route: '/settings'
+  },
+  {
+    targetId: 'tour-settings-content',
+    title: 'Configuraciones de la Sección',
+    description: 'Modifica los valores del negocio, cambia el PIN de seguridad de administrador o activa alertas automáticas.',
+    placement: 'left',
+    route: '/settings'
   }
 ];
 

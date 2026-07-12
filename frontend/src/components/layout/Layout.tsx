@@ -49,14 +49,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       const onboardingCompletedLocal = localStorage.getItem(`kiosnet_onboarding_completed_${user.id}`) === 'true';
       const onboardingCompletedDb = user.onboardingCompleted === true;
 
-      if (!onboardingCompletedLocal && !onboardingCompletedDb) {
+      if (!onboardingCompletedLocal && !onboardingCompletedDb && !tourActive) {
         const timer = setTimeout(() => {
           startTour();
         }, 1500);
         return () => clearTimeout(timer);
       }
     }
-  }, [user, startTour]);
+  }, [user, startTour, tourActive]);
 
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
