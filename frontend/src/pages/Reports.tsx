@@ -90,7 +90,7 @@ const Reports: React.FC = () => {
   }, [history]);
 
   return (
-    <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto pb-20">
+    <div className="md:p-8 p-4 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto pb-20">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">

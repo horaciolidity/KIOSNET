@@ -161,7 +161,7 @@ const Cash: React.FC = () => {
   }
 
   return (
-    <div className="p-8 space-y-8 h-[calc(100vh-64px)] overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-hide">
+    <div className="md:p-8 p-4 space-y-8 h-[calc(100vh-64px)] overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-hide">
 
       {/* ── Header & Main Actions ── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">

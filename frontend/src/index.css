@@ -108,3 +108,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media (max-w: 768px) {
+  html {
+    font-size: 13.5px;
+  }
+}

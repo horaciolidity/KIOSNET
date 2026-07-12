@@ -56,7 +56,7 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-5xl">
+    <div className="md:p-8 p-4 space-y-8 max-w-5xl">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Ajustes del Sistema</h1>

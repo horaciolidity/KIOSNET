@@ -178,7 +178,7 @@ const Inventory: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="md:p-8 p-4 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Inventario</h1>

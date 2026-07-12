@@ -62,7 +62,7 @@ const History: React.FC = () => {
   const totalExpenses = filteredHistory.filter(t => t.type === 'EGRESO').reduce((s, t) => s + t.amount, 0);
 
   return (
-    <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto">
+    <div className="md:p-8 p-4 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">

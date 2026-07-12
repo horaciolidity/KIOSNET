@@ -100,7 +100,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto pb-20">
+    <div className="md:p-8 p-4 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto pb-20">
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white">Panel de Control</h1>

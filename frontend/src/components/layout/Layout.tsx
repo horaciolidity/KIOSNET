@@ -72,6 +72,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [showMobileBanner, setShowMobileBanner] = useState(false);
+
+  useEffect(() => {
+    const hideBanner = localStorage.getItem('kiosnet_hide_mobile_recommendation') === 'true';
+    if (!hideBanner && window.innerWidth < 768) {
+      setShowMobileBanner(true);
+    }
+  }, []);
 
   // Close sidebar on mobile screens by default
   useEffect(() => {
@@ -519,7 +527,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-40">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:px-8 px-4 z-40">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-all"
@@ -547,6 +555,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          {/* PC Recommendation Banner on Mobile */}
+          {showMobileBanner && (
+            <div className="md:hidden bg-blue-600 dark:bg-blue-700 text-white px-5 py-3 flex items-center justify-between text-xs font-bold transition-all border-b border-blue-500/25 shadow-sm animate-in slide-in-from-top duration-300">
+              <span className="flex items-center gap-1.5 leading-snug pr-2">
+                💻 Para aprovechar al máximo KIOSNET (lectores, ticketeras, etc.), te recomendamos usar una PC.
+              </span>
+              <button 
+                onClick={() => {
+                  setShowMobileBanner(false);
+                  localStorage.setItem('kiosnet_hide_mobile_recommendation', 'true');
+                }}
+                className="p-1 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {user && !user.subActive && (user.salesCount ?? 0) >= 50 && (
             <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-600 text-white px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border-b border-red-500/20 animate-in slide-in-from-top duration-300">
               <div className="flex items-center gap-3">
