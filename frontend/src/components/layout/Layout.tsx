@@ -45,12 +45,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Auto-start tour for new users on mount
   useEffect(() => {
-    const onboardingCompleted = localStorage.getItem('kiosnet_onboarding_completed');
-    if (!onboardingCompleted && user) {
-      const timer = setTimeout(() => {
-        startTour();
-      }, 1500);
-      return () => clearTimeout(timer);
+    if (user) {
+      const onboardingCompletedLocal = localStorage.getItem(`kiosnet_onboarding_completed_${user.id}`) === 'true';
+      const onboardingCompletedDb = user.onboardingCompleted === true;
+
+      if (!onboardingCompletedLocal && !onboardingCompletedDb) {
+        const timer = setTimeout(() => {
+          startTour();
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
   }, [user, startTour]);
 

@@ -12,6 +12,7 @@ export interface User {
   subActive: boolean;
   subExpiresAt?: string | Date | null;
   salesCount?: number;
+  onboardingCompleted?: boolean;
 }
 
 interface AuthState {
@@ -54,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
           const { data: dbUser, error: dbUserError } = await supabase
             .from('User')
             .select(`
-              id, email, name, role, tenantId,
+              id, email, name, role, tenantId, onboardingCompleted,
               tenant:Tenant(plan, subActive, subExpiresAt)
             `)
             .eq('id', session.user.id)
@@ -82,7 +83,8 @@ export const useAuthStore = create<AuthState>()(
               plan: tenant?.plan || 'FREE',
               subActive: tenant?.subActive || false,
               subExpiresAt: tenant?.subExpiresAt || null,
-              salesCount: count || 0
+              salesCount: count || 0,
+              onboardingCompleted: dbUser.onboardingCompleted || false
             },
             token: session.access_token
           });

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { supabase } from '../utils/supabaseClient';
+import { useAuthStore } from './useAuthStore';
 
 export interface TourStep {
   targetId: string; // DOM element ID to highlight
@@ -105,7 +107,6 @@ export const useTourStore = create<TourState>((set, get) => ({
   steps: [],
 
   startTour: () => {
-    const isCompleted = localStorage.getItem('kiosnet_onboarding_completed') === 'true';
     // If starting manually or first time
     set({ active: true, stepIndex: 0 });
   },
@@ -132,8 +133,28 @@ export const useTourStore = create<TourState>((set, get) => ({
     }
   },
 
-  endTour: () => {
-    localStorage.setItem('kiosnet_onboarding_completed', 'true');
+  endTour: async () => {
+    const user = useAuthStore.getState().user;
+    if (user) {
+      localStorage.setItem(`kiosnet_onboarding_completed_${user.id}`, 'true');
+      try {
+        await supabase
+          .from('User')
+          .update({ onboardingCompleted: true })
+          .eq('id', user.id);
+        
+        useAuthStore.setState({
+          user: {
+            ...user,
+            onboardingCompleted: true
+          }
+        });
+      } catch (err) {
+        console.error('Error updating onboarding status in Supabase:', err);
+      }
+    } else {
+      localStorage.setItem('kiosnet_onboarding_completed', 'true');
+    }
     set({ active: false, stepIndex: 0, steps: [] });
   }
 }));

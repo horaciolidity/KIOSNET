@@ -40,7 +40,7 @@ const Login: React.FC = () => {
       const { data: dbUser, error: dbUserError } = await supabase
         .from('User')
         .select(`
-          id, email, name, role, tenantId,
+          id, email, name, role, tenantId, onboardingCompleted,
           tenant:Tenant(plan, subActive, subExpiresAt)
         `)
         .eq('id', sessionUser.id)
@@ -65,7 +65,8 @@ const Login: React.FC = () => {
         plan: tenant?.plan || 'FREE',
         subActive: tenant?.subActive || false,
         subExpiresAt: tenant?.subExpiresAt || null,
-        salesCount: count || 0
+        salesCount: count || 0,
+        onboardingCompleted: dbUser.onboardingCompleted || false
       };
 
       if (isAutoRegistered) {
@@ -180,7 +181,8 @@ const Login: React.FC = () => {
         plan: 'FREE',
         subActive: false,
         subExpiresAt: null,
-        salesCount: 0
+        salesCount: 0,
+        onboardingCompleted: false
       };
 
       setTimeout(() => {

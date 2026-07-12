@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTourStore } from '../../store/useTourStore';
-import { ChevronLeft, ChevronRight, X, Sparkles, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Sparkles } from 'lucide-react';
 
 export const TourOverlay: React.FC = () => {
   const location = useLocation();
