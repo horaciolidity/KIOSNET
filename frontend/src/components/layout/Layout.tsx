@@ -554,7 +554,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300 md:pb-0 pb-16">
           {/* PC Recommendation Banner on Mobile */}
           {showMobileBanner && (
             <div className="md:hidden bg-blue-600 dark:bg-blue-700 text-white px-5 py-3 flex items-center justify-between text-xs font-bold transition-all border-b border-blue-500/25 shadow-sm animate-in slide-in-from-top duration-300">
@@ -791,6 +791,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       
       {/* Interactive Tour Overlay */}
       <TourOverlay />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around items-center py-2 z-40 shadow-lg">
+        {menuItems.slice(0, 5).map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+              location.pathname === item.path 
+                ? 'text-blue-600 dark:text-blue-400 font-black' 
+                : 'text-slate-500 dark:text-slate-400 font-medium'
+            }`}
+          >
+            <div className={location.pathname === item.path ? 'scale-110 transition-transform text-blue-600 dark:text-blue-400' : ''}>
+              {item.icon}
+            </div>
+            <span className="text-[9px] uppercase tracking-wider">{item.label}</span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 };

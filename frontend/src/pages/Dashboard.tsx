@@ -171,7 +171,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Stats Grid */}
-      <div id="tour-dashboard-stats" className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
+      <div id="tour-dashboard-stats" className={`grid grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
         <StatCard title="Ventas Hoy" value={`$${salesToday.toLocaleString()}`} icon={<DollarSign className="w-6 h-6 text-blue-600" />} color="blue" />
         <StatCard title="Productos" value={products.length.toString()} icon={<Package className="w-6 h-6 text-emerald-600" />} color="emerald" />
         <StatCard title="Stock Bajo" value={lowStockCount.toString()} icon={<AlertTriangle className="w-6 h-6 text-orange-600" />} color="orange" />
@@ -186,7 +186,7 @@ const Dashboard: React.FC = () => {
       {/* Plans Section */}
       <div className="space-y-6">
         <h2 className="text-2xl font-black text-slate-900 dark:text-white">Planes de Suscripción Mensual</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-2 gap-4">
           {/* Standard Plan */}
           <PlanCard 
             title="Plan Estándar"

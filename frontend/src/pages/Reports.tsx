@@ -112,7 +112,7 @@ const Reports: React.FC = () => {
       </div>
 
       {/* High Level Stats */}
-      <div id="tour-reports-stats" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="tour-reports-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <ReportStatCard 
           title="Ventas Totales" 
           value={`$${stats.totalSales.toLocaleString()}`} 
