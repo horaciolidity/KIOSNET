@@ -55,6 +55,10 @@ const POS: React.FC = () => {
   const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
   const hasMP = isPro && businessInfo?.mercadoPago?.isActive;
 
+  const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
+  const isFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50);
+  const salesBlocked = isPlanExpired || isFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
+
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Checkout State
@@ -179,14 +183,16 @@ const POS: React.FC = () => {
     }
 
     try {
-      // 1. Verify billing limits (max 50 sales for free tier)
       const { count: salesCount } = await supabase
         .from('Sale')
         .select('*', { count: 'exact', head: true })
         .eq('tenantId', user.tenantId);
 
-      if (!user.subActive && salesCount !== null && salesCount >= 50) {
-        alert('Límite de ventas gratuitas (50 ventas) alcanzado. Por favor, activa tu suscripción en Configuración para continuar.');
+      const liveFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && salesCount !== null && salesCount >= 50);
+      const isLiveBlocked = isPlanExpired || liveFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
+
+      if (isLiveBlocked) {
+        alert('Tu período de facturación ha vencido o has alcanzado el límite del plan gratuito. Por favor, activa o renueva tu suscripción en la sección de pagos para continuar.');
         return;
       }
 
@@ -710,7 +716,7 @@ const POS: React.FC = () => {
             <span className="text-3xl font-black text-blue-600 tracking-tighter">${total.toLocaleString()}</span>
           </div>
 
-          {!user?.subActive && (user?.salesCount ?? 0) >= 50 ? (
+          {salesBlocked ? (
             <button 
               onClick={() => window.location.href = '/billing'}
               className="w-full bg-gradient-to-r from-red-600 to-amber-600 text-white py-5 rounded-[24px] font-black text-lg hover:from-red-500 hover:to-amber-500 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-2"
@@ -835,7 +841,7 @@ const POS: React.FC = () => {
                 <span className="text-3xl font-black text-blue-600 tracking-tighter">${total.toLocaleString()}</span>
               </div>
 
-              {!user?.subActive && (user?.salesCount ?? 0) >= 50 ? (
+              {salesBlocked ? (
                 <button 
                   onClick={() => window.location.href = '/billing'}
                   className="w-full bg-gradient-to-r from-red-600 to-amber-600 text-white py-5 rounded-[24px] font-black text-lg hover:from-red-500 hover:to-amber-500 transition-all shadow-xl shadow-red-600/20 flex items-center justify-center gap-2 cursor-pointer"

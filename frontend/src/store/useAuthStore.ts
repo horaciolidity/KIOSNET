@@ -81,7 +81,7 @@ export const useAuthStore = create<AuthState>()(
               role: dbUser.role as 'ADMIN' | 'EMPLOYEE',
               tenantId: dbUser.tenantId,
               plan: tenant?.plan || 'FREE',
-              subActive: tenant?.subActive || false,
+              subActive: (tenant?.subActive && (tenant?.subExpiresAt ? new Date(tenant.subExpiresAt) > new Date() : true)) || false,
               subExpiresAt: tenant?.subExpiresAt || null,
               salesCount: count || 0,
               onboardingCompleted: dbUser.onboardingCompleted || false

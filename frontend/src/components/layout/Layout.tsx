@@ -317,6 +317,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [location.search, navigate, location.pathname, token, setAuth, user]);
 
   const isEmployee = user?.role === 'EMPLOYEE';
+  const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
+  const isFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50);
+  const salesBlocked = isPlanExpired || isFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
 
   const handleRoleToggle = () => {
     if (isEmployee) {
@@ -572,16 +575,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             </div>
           )}
-          {user && !user.subActive && (user.salesCount ?? 0) >= 50 && (
+          {user && salesBlocked && (
             <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-600 text-white px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border-b border-red-500/20 animate-in slide-in-from-top duration-300">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white shrink-0">
                   <Lock size={20} className="animate-pulse" />
                 </div>
                 <div>
-                  <h4 className="font-black text-sm tracking-tight uppercase">¡Período gratuito completado!</h4>
+                  <h4 className="font-black text-sm tracking-tight uppercase">¡Facturación Bloqueada!</h4>
                   <p className="text-xs text-red-100 font-medium mt-0.5">
-                    Has alcanzado las 50 ventas de prueba. Las ventas están bloqueadas temporalmente hasta que actives tu suscripción. Puedes seguir agregando productos a tu inventario.
+                    Tu período de facturación ha vencido o has alcanzado el límite del plan gratuito. Por favor, activa o renueva tu suscripción para continuar registrando ventas en el POS.
                   </p>
                 </div>
               </div>
