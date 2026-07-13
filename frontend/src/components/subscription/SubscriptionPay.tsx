@@ -23,6 +23,7 @@ const SubscriptionPay: React.FC = () => {
   const [selectedPlan, setSelectedPlan] = useState<'STANDARD' | 'PRO'>('STANDARD');
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
+  const [paymentSessionStart, setPaymentSessionStart] = useState<number>(Date.now());
 
   // Helper to verify and activate payment directly from client side
   const checkAndActivatePayment = async (plan: 'STANDARD' | 'PRO', months: number, paymentId?: string | null) => {
@@ -40,7 +41,10 @@ const SubscriptionPay: React.FC = () => {
         const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
-        const paymentInfo = pResponse.data;
+        let paymentInfo = pResponse.data;
+        if (typeof paymentInfo === 'string') {
+          paymentInfo = JSON.parse(paymentInfo);
+        }
         if (paymentInfo.status === 'approved' && paymentInfo.external_reference?.startsWith('sub_')) {
           approvedPaymentFound = true;
           const parts = paymentInfo.external_reference.split('_');
@@ -60,7 +64,15 @@ const SubscriptionPay: React.FC = () => {
         const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
-        const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');
+        let searchData = searchResponse.data;
+        if (typeof searchData === 'string') {
+          searchData = JSON.parse(searchData);
+        }
+        const approvedPayment = searchData.results?.find((p: any) => {
+          if (p.status !== 'approved') return false;
+          const approvalTime = new Date(p.date_approved || p.date_created).getTime();
+          return approvalTime > paymentSessionStart;
+        });
         if (approvedPayment) {
           approvedPaymentFound = true;
           const parts = ref.split('_');
@@ -237,6 +249,7 @@ const SubscriptionPay: React.FC = () => {
   const handlePaySubscription = async () => {
     setLoading(true);
     setError('');
+    setPaymentSessionStart(Date.now());
     try {
       const numMonths = selectedMonths;
       const price = selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard;
@@ -289,8 +302,12 @@ const SubscriptionPay: React.FC = () => {
   };
 
 
-  const handlePayQR = async () => {
-    setQrLoading(true);
+  const handlePayQR = async (silent: boolean | React.MouseEvent = false) => {
+    const isSilent = silent === true;
+    if (!isSilent) {
+      setQrLoading(true);
+      setPaymentSessionStart(Date.now());
+    }
     setError('');
     try {
       const numMonths = selectedMonths;
@@ -335,11 +352,26 @@ const SubscriptionPay: React.FC = () => {
       setPaymentOpened(true);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Error al generar QR. Inténtalo de nuevo.');
+      if (!isSilent) setError(err.message || 'Error al generar QR. Inténtalo de nuevo.');
     } finally {
-      setQrLoading(false);
+      if (!isSilent) setQrLoading(false);
     }
   };
+
+  // Silent auto-refresh QR & link preference every 30 seconds
+  useEffect(() => {
+    let refreshIntervalId: any;
+
+    if (paymentOpened && qrImageUrl) {
+      refreshIntervalId = setInterval(() => {
+        handlePayQR(true);
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (refreshIntervalId) clearInterval(refreshIntervalId);
+    };
+  }, [paymentOpened, qrImageUrl, selectedPlan, selectedMonths]);
 
   const handleCheckPaymentManually = async () => {
     setChecking(true);
