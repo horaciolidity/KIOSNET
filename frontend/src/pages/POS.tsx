@@ -25,6 +25,7 @@ import { useCashStore } from '../store/useCashStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../utils/supabaseClient';
+import AudioHelper from '../utils/audioHelper';
 import axios from 'axios';
 
 interface CartItem extends Product {
@@ -85,6 +86,7 @@ const POS: React.FC = () => {
       alert('Debes abrir la caja primero');
       return;
     }
+    AudioHelper.playScanBeep();
     setCart(prevCart => {
       const existing = prevCart.find(item => item.id === product.id);
       if (existing) {
@@ -290,6 +292,7 @@ const POS: React.FC = () => {
 
       setSaleId(newSaleId);
       setIsFinished(true);
+      AudioHelper.playSuccessBeep();
       setIsWaitingForMP(false);
       
       // Dynamic database-backed salesCount increment

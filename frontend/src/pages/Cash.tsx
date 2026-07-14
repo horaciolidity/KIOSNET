@@ -22,6 +22,7 @@ import {
 import { useCashStore, mapDbToFrontendType } from '../store/useCashStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import AudioHelper from '../utils/audioHelper';
 
 // ─────────────────────────────────────────────────────────────
 // Method badge label & color helper
@@ -96,10 +97,11 @@ const Cash: React.FC = () => {
 
   const saleCount        = txs.filter(t => t.type === 'VENTA').length;
 
-  const handleOpen = (e: React.FormEvent) => {
+  const handleOpen = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(openingAmount) || 0;
-    openBox(amount);
+    await openBox(amount);
+    AudioHelper.playCashRegister();
     setOpeningAmount('');
   };
 

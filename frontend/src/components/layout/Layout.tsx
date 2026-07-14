@@ -19,7 +19,8 @@ import {
   Lock,
   Unlock,
   Crown,
-  HelpCircle
+  HelpCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -28,6 +29,8 @@ import { useTourStore } from '../../store/useTourStore';
 import { useCashStore } from '../../store/useCashStore';
 import { TourOverlay } from '../tour/TourOverlay';
 import { supabase } from '../../utils/supabaseClient';
+import { useInventoryStore } from '../../store/useInventoryStore';
+import AudioHelper from '../../utils/audioHelper';
 import axios from 'axios';
 
 interface LayoutProps {
@@ -43,6 +46,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout, token, setAuth, fetchUserSession } = useAuthStore();
   const { businessInfo } = useSettingsStore();
   const { active: tourActive, startTourForRoute } = useTourStore();
+  const { session, fetchActiveSession } = useCashStore();
+  const { products, fetchProducts } = useInventoryStore();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   // Auto-start tour for the current route if never completed
   useEffect(() => {
@@ -103,10 +109,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   }, [isDarkMode]);
 
-  // Sync / Fetch user profile from Supabase on load to reflect subscription changes in real-time
+  // Sync / Fetch user profile, products and cash session from Supabase on load
   useEffect(() => {
     if (user) {
       fetchUserSession();
+      fetchProducts();
+      fetchActiveSession();
     }
   }, [location.pathname]);
 
@@ -320,6 +328,88 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
   const isFreeTrialActive = (user?.salesCount ?? 0) < 50;
   const salesBlocked = isFreeTrialActive ? false : (user?.plan === 'FREE' ? true : isPlanExpired);
+
+  // Contextual notifications list
+  const notifications: Array<{
+    id: string;
+    title: string;
+    desc: string;
+    icon: React.ReactNode;
+    color: string;
+    link: string;
+  }> = [];
+
+  if (user) {
+    if (user.plan === 'FREE') {
+      const remainingSales = Math.max(0, 50 - (user.salesCount ?? 0));
+      notifications.push({
+        id: 'sub_free',
+        title: 'Prueba de Ventas Gratis',
+        desc: `Te quedan ${remainingSales} de 50 ventas de prueba gratis.`,
+        icon: <Crown size={16} />,
+        color: 'text-indigo-600 bg-indigo-500/10 border-indigo-500/20 dark:text-indigo-400 dark:bg-indigo-500/5',
+        link: '/billing'
+      });
+    } else {
+      const isExpired = user.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
+      if (isExpired) {
+        notifications.push({
+          id: 'sub_expired',
+          title: 'Licencia Vencida',
+          desc: 'Tu período de facturación ha vencido. Renueva tu suscripción para reanudar el POS.',
+          icon: <Lock size={16} />,
+          color: 'text-rose-600 bg-rose-500/10 border-rose-500/20 dark:text-rose-400 dark:bg-rose-500/5',
+          link: '/billing'
+        });
+      } else if (user.subExpiresAt) {
+        const days = Math.max(0, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+        if (days <= 7) {
+          notifications.push({
+            id: 'sub_warning',
+            title: 'Plan por Vencer',
+            desc: `Tu plan KIOSNET ${user.plan === 'PRO' ? 'Pro' : 'Estándar'} vence en ${days} días.`,
+            icon: <AlertTriangle size={16} />,
+            color: 'text-amber-600 bg-amber-500/10 border-amber-500/20 dark:text-amber-400 dark:bg-amber-500/5',
+            link: '/billing'
+          });
+        }
+      }
+    }
+  }
+
+  const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
+  if (lowStockCount > 0) {
+    notifications.push({
+      id: 'low_stock',
+      title: 'Alerta de Stock Bajo',
+      desc: `Tienes ${lowStockCount} producto(s) por debajo del stock mínimo configurado.`,
+      icon: <Package size={16} />,
+      color: 'text-rose-600 bg-rose-500/10 border-rose-500/20 dark:text-rose-400 dark:bg-rose-500/5',
+      link: '/inventory'
+    });
+  }
+
+  if (session) {
+    if (!session.isOpen) {
+      notifications.push({
+        id: 'cash_closed',
+        title: 'Caja Cerrada',
+        desc: 'El turno de caja está cerrado. Abre la caja para poder registrar ventas.',
+        icon: <Wallet size={16} />,
+        color: 'text-slate-500 bg-slate-500/10 border-slate-500/20 dark:text-slate-400 dark:bg-slate-500/5',
+        link: '/cash'
+      });
+    } else {
+      notifications.push({
+        id: 'cash_open',
+        title: 'Caja Activa Abierta',
+        desc: `Turno iniciado. Saldo actual: $${(session.currentBalance ?? 0).toLocaleString()}`,
+        icon: <Wallet size={16} />,
+        color: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-500/5',
+        link: '/cash'
+      });
+    }
+  }
 
   const handleRoleToggle = () => {
     if (isEmployee) {
@@ -539,10 +629,64 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </button>
 
           <div className="flex items-center gap-6">
-            <button className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-all">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  setIsNotifOpen(!isNotifOpen);
+                  if (!isNotifOpen) AudioHelper.playNotificationBell();
+                }}
+                className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-all cursor-pointer"
+              >
+                <Bell size={20} />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white dark:border-slate-900 shadow-sm animate-pulse">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+
+              {isNotifOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsNotifOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-2">
+                      <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Notificaciones ({notifications.length})</span>
+                      <button 
+                        onClick={() => setIsNotifOpen(false)}
+                        className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-6">No tienes notificaciones pendientes.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                        {notifications.map((n) => (
+                          <Link
+                            key={n.id}
+                            to={n.link}
+                            onClick={() => setIsNotifOpen(false)}
+                            className="flex gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent hover:border-slate-100 dark:hover:border-slate-800/80 transition-all text-left group"
+                          >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${n.color}`}>
+                              {n.icon}
+                            </div>
+                            <div className="space-y-0.5">
+                              <h5 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">{n.title}</h5>
+                              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">{n.desc}</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-800">
               <div className="text-right hidden sm:block">
