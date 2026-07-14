@@ -318,8 +318,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isEmployee = user?.role === 'EMPLOYEE';
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
-  const isFreeTrialExceeded = user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50;
-  const salesBlocked = user?.plan === 'FREE' ? isFreeTrialExceeded : isPlanExpired;
+  const isFreeTrialActive = (user?.salesCount ?? 0) < 50;
+  const salesBlocked = isFreeTrialActive ? false : (user?.plan === 'FREE' ? true : isPlanExpired);
 
   const handleRoleToggle = () => {
     if (isEmployee) {
