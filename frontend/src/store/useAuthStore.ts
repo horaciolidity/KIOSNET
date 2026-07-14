@@ -54,10 +54,7 @@ export const useAuthStore = create<AuthState>()(
           // Fetch additional profile details
           const { data: dbUser, error: dbUserError } = await supabase
             .from('User')
-            .select(`
-              id, email, name, role, tenantId, onboardingCompleted,
-              tenant:Tenant(plan, subActive, subExpiresAt)
-            `)
+            .select('id, email, name, role, tenantId, onboardingCompleted')
             .eq('id', session.user.id)
             .single();
 
@@ -66,12 +63,21 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
 
+          // Fetch tenant explicitly to avoid array/object mapping issues
+          const { data: tenant, error: tenantError } = await supabase
+            .from('Tenant')
+            .select('plan, subActive, subExpiresAt')
+            .eq('id', dbUser.tenantId)
+            .single();
+
+          if (tenantError) {
+            console.error('Tenant not found for session user:', tenantError);
+          }
+
           const { count } = await supabase
             .from('Sale')
             .select('*', { count: 'exact', head: true })
             .eq('tenantId', dbUser.tenantId);
-
-          const tenant = dbUser.tenant as any;
 
           set({
             user: {

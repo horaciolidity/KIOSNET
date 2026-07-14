@@ -39,10 +39,7 @@ const Login: React.FC = () => {
       // 2. Fetch public User and Tenant profile data
       const { data: dbUser, error: dbUserError } = await supabase
         .from('User')
-        .select(`
-          id, email, name, role, tenantId, onboardingCompleted,
-          tenant:Tenant(plan, subActive, subExpiresAt)
-        `)
+        .select('id, email, name, role, tenantId, onboardingCompleted')
         .eq('id', sessionUser.id)
         .single();
 
@@ -50,12 +47,21 @@ const Login: React.FC = () => {
         throw new Error('No se encontró el perfil del usuario en la base de datos');
       }
 
+      // Fetch tenant explicitly to avoid array/object mapping issues
+      const { data: tenant, error: tenantError } = await supabase
+        .from('Tenant')
+        .select('plan, subActive, subExpiresAt')
+        .eq('id', dbUser.tenantId)
+        .single();
+
+      if (tenantError) {
+        throw new Error('No se encontró el comercio asociado en la base de datos');
+      }
+
       const { count } = await supabase
         .from('Sale')
         .select('*', { count: 'exact', head: true })
         .eq('tenantId', dbUser.tenantId);
-
-      const tenant = dbUser.tenant as any;
       const userObj = {
         id: dbUser.id,
         email: dbUser.email,

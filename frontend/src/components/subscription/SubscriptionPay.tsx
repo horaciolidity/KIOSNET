@@ -85,17 +85,17 @@ const SubscriptionPay: React.FC = () => {
     }
 
     if (approvedPaymentFound) {
-      // Get current Tenant details
+      // Get current Tenant details explicitly to avoid relation mapping issues
       const { data: tenant, error: fetchErr } = await supabase
         .from('Tenant')
-        .select('*')
+        .select('plan, subActive, subExpiresAt')
         .eq('id', tenantId)
         .single();
 
       if (fetchErr) throw fetchErr;
 
       let baseDate = new Date();
-      if (tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
+      if (tenant?.plan !== 'FREE' && tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
         baseDate = new Date(tenant.subExpiresAt);
       }
       baseDate.setMonth(baseDate.getMonth() + approvedMonths);
@@ -717,18 +717,16 @@ const SubscriptionPay: React.FC = () => {
               )}
             </button>
             <button
-              onClick={handlePayQR}
+              onClick={() => {
+                setPaymentOpened(true);
+                setQrImageUrl(null);
+                setQrCodeUrl(null);
+              }}
               disabled={loading || qrLoading}
               className="w-full bg-slate-800 hover:bg-slate-700 text-white font-extrabold py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 disabled:opacity-70 group cursor-pointer text-base uppercase tracking-wider"
             >
-              {qrLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-400" />
-                  Pagar con QR en Pantalla
-                </>
-              )}
+              <QrCode className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-400" />
+              Pagar con QR en Pantalla
             </button>
             <p className="text-xs text-slate-500">
               Abona de forma segura mediante Mercado Pago. La activación de tu cuenta será automática e inmediata.
@@ -793,9 +791,45 @@ const SubscriptionPay: React.FC = () => {
           </div>
         ) : (
           <div className="mt-8 max-w-md mx-auto bg-slate-900/90 border border-white/10 rounded-3xl p-8 text-center space-y-6 flex flex-col items-center shadow-2xl backdrop-blur-xl">
-            {qrImageUrl ? (
-              <div className="flex flex-col items-center w-full">
-                <h3 className="text-xl font-bold mb-2">Escanea para pagar</h3>
+            {!qrImageUrl ? (
+              <div className="flex flex-col items-center w-full space-y-6 py-4">
+                <h3 className="text-xl font-bold text-white">Pago Temporal Único</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Para tu seguridad, genera una orden de pago con QR temporal de 30 segundos. La verificación del pago se activará inmediatamente tras su generación.
+                </p>
+                <button
+                  onClick={() => handlePayQR(false)}
+                  disabled={qrLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-4 px-6 rounded-2xl transition-all shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 text-sm uppercase tracking-wider cursor-pointer"
+                >
+                  {qrLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <QrCode className="w-5 h-5 animate-pulse" />
+                      Generar Pago
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setPaymentOpened(false)}
+                  className="text-xs text-slate-500 hover:text-slate-300 font-bold transition-all mt-2"
+                >
+                  Cancelar y Volver
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col items-center w-full">
+                <div className="w-full flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold">Escanea para pagar</h3>
+                  <button 
+                    onClick={() => setPaymentOpened(false)}
+                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg transition-all"
+                  >
+                    Volver
+                  </button>
+                </div>
                 
                 {/* Mobile direct payment redirection button */}
                 <div className="w-full md:hidden mb-6 space-y-4">
@@ -870,12 +904,6 @@ const SubscriptionPay: React.FC = () => {
                 </div>
 
               </div>
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mb-2 relative">
-                <div className="absolute inset-0 rounded-full border border-blue-500/40 animate-ping opacity-75"></div>
-                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-              </div>
-            )}
 
             <div>
               <h3 className="text-lg font-bold">Esperando confirmación...</h3>
@@ -926,8 +954,10 @@ const SubscriptionPay: React.FC = () => {
                 ¿Hubo un error? WhatsApp de Soporte
               </a>
             </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
+      )}
 
         <div className="text-center text-slate-600 text-xs mt-12">
           © 2026 KIOSNET. Todos los derechos reservados. Sistema SaaS multi-usuario de administración de comercios y puntos de venta.

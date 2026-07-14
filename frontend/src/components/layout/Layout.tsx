@@ -192,7 +192,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             if (approvedPaymentFound) {
               let baseDate = new Date();
-              if (tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
+              if (tenant?.plan !== 'FREE' && tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
                 baseDate = new Date(tenant.subExpiresAt);
               }
 
@@ -318,8 +318,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isEmployee = user?.role === 'EMPLOYEE';
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
-  const isFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50);
-  const salesBlocked = isPlanExpired || isFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
+  const isFreeTrialExceeded = user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50;
+  const salesBlocked = user?.plan === 'FREE' ? isFreeTrialExceeded : isPlanExpired;
 
   const handleRoleToggle = () => {
     if (isEmployee) {

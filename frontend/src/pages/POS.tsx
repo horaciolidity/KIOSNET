@@ -56,8 +56,8 @@ const POS: React.FC = () => {
   const hasMP = isPro && businessInfo?.mercadoPago?.isActive;
 
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
-  const isFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50);
-  const salesBlocked = isPlanExpired || isFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
+  const isFreeTrialExceeded = user?.plan === 'FREE' && (user?.salesCount ?? 0) >= 50;
+  const salesBlocked = user?.plan === 'FREE' ? isFreeTrialExceeded : isPlanExpired;
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -188,8 +188,8 @@ const POS: React.FC = () => {
         .select('*', { count: 'exact', head: true })
         .eq('tenantId', user.tenantId);
 
-      const liveFreeTrialExceeded = (!user?.subActive && user?.plan === 'FREE' && salesCount !== null && salesCount >= 50);
-      const isLiveBlocked = isPlanExpired || liveFreeTrialExceeded || (!user?.subActive && user?.plan !== 'FREE');
+      const liveFreeTrialExceeded = user?.plan === 'FREE' && salesCount !== null && salesCount >= 50;
+      const isLiveBlocked = user?.plan === 'FREE' ? liveFreeTrialExceeded : isPlanExpired;
 
       if (isLiveBlocked) {
         alert('Tu período de facturación ha vencido o has alcanzado el límite del plan gratuito. Por favor, activa o renueva tu suscripción en la sección de pagos para continuar.');
