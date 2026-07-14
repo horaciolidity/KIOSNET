@@ -124,8 +124,7 @@ export const TourOverlay: React.FC = () => {
         className="fixed inset-0 pointer-events-auto"
         style={{
           zIndex: 100,
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(3px)',
+          backgroundColor: 'rgba(15, 23, 42, 0.8)',
           clipPath: highlightRect 
             ? `polygon(
                 0% 0%, 
