@@ -153,8 +153,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           try {
             // Strategy 1: Direct payment lookup if we have paymentId
             if (paymentId) {
-              const targetUrl = `https://api.mercadopago.com/v1/payments/${paymentId}`;
-              const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+              const targetUrl = `https://api.mercadopago.com/v1/payments/${paymentId}?_ts=${Date.now()}`;
+              const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}&_ts=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${mpToken}` }
               });
               const paymentInfo = pResponse.data;
@@ -179,8 +179,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 ? `sub_PRO_${tenantId}_upgrade_${remainingDays}` 
                 : `sub_${plan}_${tenantId}_${months}`;
                 
-              const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`;
-              const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+              const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${ref}&_ts=${Date.now()}`;
+              const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}&_ts=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${mpToken}` }
               });
               const approvedPayment = searchResponse.data.results?.find((p: any) => p.status === 'approved');

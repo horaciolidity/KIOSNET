@@ -200,8 +200,8 @@ const Dashboard: React.FC = () => {
               { text: "Ticketera Térmica 80mm", active: true },
               { text: "Control de Inventario", active: true },
               { text: "Modo Empleado", active: false },
-              { text: "Pantalla Display Cliente", active: false },
-              { text: "Gestión de Créditos", active: false },
+              { text: "Pantalla Cliente", active: false },
+              { text: "Componente de Clientes", active: false },
             ]}
           />
 
@@ -217,9 +217,9 @@ const Dashboard: React.FC = () => {
               { text: "Ventas Ilimitadas", active: true },
               { text: "Lector de Código de Barras", active: true },
               { text: "Ticketera Térmica 80mm", active: true },
-              { text: "Modo Empleado Configurable", active: true },
-              { text: "Pantalla Display Cliente", active: true },
-              { text: "Gestión de Créditos Cliente", active: true },
+              { text: "Modo Empleado", active: true },
+              { text: "Pantalla Cliente", active: true },
+              { text: "Componente de Clientes", active: true },
               { text: "Reportes Avanzados", active: true },
             ]}
           />

@@ -37,8 +37,8 @@ const SubscriptionPay: React.FC = () => {
     // Strategy 1: Direct payment lookup if we have paymentId
     if (paymentId) {
       try {
-        const targetUrl = `https://api.mercadopago.com/v1/payments/${paymentId}`;
-        const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+        const targetUrl = `https://api.mercadopago.com/v1/payments/${paymentId}?_ts=${Date.now()}`;
+        const pResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}&_ts=${Date.now()}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
         let paymentInfo = pResponse.data;
@@ -48,8 +48,12 @@ const SubscriptionPay: React.FC = () => {
         if (paymentInfo.status === 'approved' && paymentInfo.external_reference?.startsWith('sub_')) {
           approvedPaymentFound = true;
           const parts = paymentInfo.external_reference.split('_');
-          approvedPlan = parts[1] || plan;
-          approvedMonths = parseInt(parts[3], 10) || months;
+          approvedPlan = (parts[1] || plan) as 'STANDARD' | 'PRO';
+          if (parts[3] === 'upgrade') {
+            approvedMonths = 0;
+          } else {
+            approvedMonths = parseInt(parts[3], 10) || months;
+          }
         }
       } catch (err) {
         console.error('Error looking up payment directly:', err);
@@ -58,10 +62,16 @@ const SubscriptionPay: React.FC = () => {
 
     // Strategy 2: Search by external_reference
     if (!approvedPaymentFound) {
-      const ref = `sub_${plan}_${tenantId}_${months}`;
+      // Check if it is an upgrade payment
+      const remainingDays = user?.subExpiresAt ? Math.max(1, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      const isUpgradeMode = user?.subActive && user?.plan === 'STANDARD' && plan === 'PRO';
+      const ref = isUpgradeMode 
+        ? `sub_PRO_${tenantId}_upgrade_${remainingDays}` 
+        : `sub_${plan}_${tenantId}_${months}`;
+
       try {
-        const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${ref}`;
-        const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+        const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${ref}&_ts=${Date.now()}`;
+        const searchResponse = await axios.get(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}&_ts=${Date.now()}`, {
           headers: { Authorization: `Bearer ${MP_DEFAULT_TOKEN}` }
         });
         let searchData = searchResponse.data;
@@ -71,13 +81,20 @@ const SubscriptionPay: React.FC = () => {
         const approvedPayment = searchData.results?.find((p: any) => {
           if (p.status !== 'approved') return false;
           const approvalTime = new Date(p.date_approved || p.date_created).getTime();
-          return approvalTime > paymentSessionStart;
+          // Allow up to 15 minutes of clock skew relative to paymentSessionStart
+          const sessionStartWithSkew = paymentSessionStart - (15 * 60 * 1000);
+          return approvalTime > sessionStartWithSkew;
         });
         if (approvedPayment) {
           approvedPaymentFound = true;
-          const parts = ref.split('_');
-          approvedPlan = parts[1] as any;
-          approvedMonths = parseInt(parts[3], 10) || 1;
+          const refUsed = approvedPayment.external_reference || ref;
+          const parts = refUsed.split('_');
+          approvedPlan = (parts[1] || plan) as 'STANDARD' | 'PRO';
+          if (parts[3] === 'upgrade') {
+            approvedMonths = 0;
+          } else {
+            approvedMonths = parseInt(parts[3], 10) || 1;
+          }
         }
       } catch (err) {
         console.error('Error searching payments by external reference:', err);
@@ -98,7 +115,12 @@ const SubscriptionPay: React.FC = () => {
       if (tenant?.plan !== 'FREE' && tenant?.subActive && tenant.subExpiresAt && new Date(tenant.subExpiresAt) > new Date()) {
         baseDate = new Date(tenant.subExpiresAt);
       }
-      baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+      
+      const isUpgradePayment = approvedPlan === 'PRO' && tenant?.plan === 'STANDARD' && tenant?.subActive;
+
+      if (!isUpgradePayment) {
+        baseDate.setMonth(baseDate.getMonth() + approvedMonths);
+      }
 
       // Update Tenant on Supabase directly!
       const { data: updatedTenant, error: updateErr } = await supabase
@@ -106,7 +128,7 @@ const SubscriptionPay: React.FC = () => {
         .update({
           subActive: true,
           plan: approvedPlan,
-          subExpiresAt: baseDate.toISOString()
+          subExpiresAt: isUpgradePayment ? tenant.subExpiresAt : baseDate.toISOString()
         })
         .eq('id', tenantId)
         .select()
@@ -252,11 +274,23 @@ const SubscriptionPay: React.FC = () => {
     setPaymentSessionStart(Date.now());
     try {
       const numMonths = selectedMonths;
-      const price = selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard;
-      const finalPrice = price * numMonths;
-      const title = selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
-      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
       const tenantId = user?.tenantId;
+      const isUpgradeMode = user?.subActive && user?.plan === 'STANDARD' && selectedPlan === 'PRO';
+      const remainingDays = user?.subExpiresAt ? Math.max(1, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      
+      const price = isUpgradeMode 
+        ? Math.max(150, Math.round(remainingDays * ((prices.price_pro - prices.price_standard) / 30))) 
+        : (selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard);
+      const finalPrice = isUpgradeMode ? price : price * numMonths;
+
+      const title = isUpgradeMode 
+        ? `Upgrade KIOSNET Pro (${remainingDays} Días restantes)` 
+        : (selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`);
+
+      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+      const externalRef = isUpgradeMode 
+        ? `sub_PRO_${tenantId}_upgrade_${remainingDays}` 
+        : `sub_${selectedPlan}_${tenantId}_${numMonths}`;
 
       const mpResponse = await axios.post(
         'https://api.mercadopago.com/checkout/preferences',
@@ -271,12 +305,12 @@ const SubscriptionPay: React.FC = () => {
             }
           ],
           back_urls: {
-            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${numMonths}`,
+            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${isUpgradeMode ? 0 : numMonths}`,
             failure: `${window.location.origin}/dashboard?sub=failure`,
             pending: `${window.location.origin}/dashboard?sub=pending`
           },
           auto_return: 'approved',
-          external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
+          external_reference: externalRef
         },
         {
           headers: {
@@ -289,7 +323,7 @@ const SubscriptionPay: React.FC = () => {
       
       // Save plan/months to localStorage BEFORE redirect so we can use them when MP returns
       localStorage.setItem('kiosnet_pending_plan', selectedPlan);
-      localStorage.setItem('kiosnet_pending_months', String(selectedMonths));
+      localStorage.setItem('kiosnet_pending_months', String(isUpgradeMode ? 0 : selectedMonths));
 
       // Redirect current tab to MP (enables native app deep-link on mobile)
       window.location.href = initPoint;
@@ -311,11 +345,23 @@ const SubscriptionPay: React.FC = () => {
     setError('');
     try {
       const numMonths = selectedMonths;
-      const price = selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard;
-      const finalPrice = price * numMonths;
-      const title = selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`;
-      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
       const tenantId = user?.tenantId;
+      const isUpgradeMode = user?.subActive && user?.plan === 'STANDARD' && selectedPlan === 'PRO';
+      const remainingDays = user?.subExpiresAt ? Math.max(1, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      
+      const price = isUpgradeMode 
+        ? Math.max(150, Math.round(remainingDays * ((prices.price_pro - prices.price_standard) / 30))) 
+        : (selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard);
+      const finalPrice = isUpgradeMode ? price : price * numMonths;
+
+      const title = isUpgradeMode 
+        ? `Upgrade KIOSNET Pro (${remainingDays} Días restantes)` 
+        : (selectedPlan === 'PRO' ? `Suscripción KIOSNET Pro (${numMonths} Mes${numMonths > 1 ? 'es' : ''})` : `Suscripción KIOSNET Estándar (${numMonths} Mes${numMonths > 1 ? 'es' : ''})`);
+
+      const planId = selectedPlan === 'PRO' ? 'kiosnet_subscription_pro' : 'kiosnet_subscription_standard';
+      const externalRef = isUpgradeMode 
+        ? `sub_PRO_${tenantId}_upgrade_${remainingDays}` 
+        : `sub_${selectedPlan}_${tenantId}_${numMonths}`;
 
       const mpResponse = await axios.post(
         'https://api.mercadopago.com/checkout/preferences',
@@ -330,12 +376,12 @@ const SubscriptionPay: React.FC = () => {
             }
           ],
           back_urls: {
-            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${numMonths}`,
+            success: `${window.location.origin}/dashboard?sub=success&plan=${selectedPlan}&months=${isUpgradeMode ? 0 : numMonths}`,
             failure: `${window.location.origin}/dashboard?sub=failure`,
             pending: `${window.location.origin}/dashboard?sub=pending`
           },
           auto_return: 'approved',
-          external_reference: `sub_${selectedPlan}_${tenantId}_${numMonths}`
+          external_reference: externalRef
         },
         {
           headers: {
@@ -408,6 +454,9 @@ const SubscriptionPay: React.FC = () => {
   const proFeatures = [
     'Todo lo del Plan Estándar',
     'Ventas mensuales 100% ILIMITADAS',
+    'Pantalla Cliente',
+    'Componente de Clientes',
+    'Modo Empleado',
     'Sincronización multiusuario activa',
     'Cobro automático QR Mercado Pago',
     'Reportes y estadísticas avanzadas',
