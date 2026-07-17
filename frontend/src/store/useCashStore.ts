@@ -199,14 +199,24 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      // Clean up movements older than 30 days
+      // Clean up movements older than 30 days for this tenant securely
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       try {
-        await supabase
-          .from('CashMovement')
-          .delete()
-          .lt('createdAt', thirtyDaysAgo.toISOString());
+        const { data: registers } = await supabase
+          .from('CashRegister')
+          .select('id')
+          .eq('tenantId', user.tenantId);
+
+        const registerIds = (registers || []).map(r => r.id);
+        
+        if (registerIds.length > 0) {
+          await supabase
+            .from('CashMovement')
+            .delete()
+            .in('registerId', registerIds)
+            .lt('createdAt', thirtyDaysAgo.toISOString());
+        }
       } catch (err) {
         console.error('Error cleaning up old cash movements:', err);
       }
