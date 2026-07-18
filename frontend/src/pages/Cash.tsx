@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   BookOpen,
-  Receipt
+  Receipt,
+  Package
 } from 'lucide-react';
 import { useCashStore, mapDbToFrontendType } from '../store/useCashStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -53,6 +54,7 @@ const Cash: React.FC = () => {
   const [showArqueo, setShowArqueo] = useState(false);
   const [activeTab, setActiveTab] = useState<'MOVIMIENTOS' | 'ARQUEOS'>('MOVIMIENTOS');
   const [expandedRegisterId, setExpandedRegisterId] = useState<string | null>(null);
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
   const [txData, setTxData] = useState({
     type: 'INGRESO' as 'INGRESO' | 'EGRESO',
     amount: '',
@@ -61,10 +63,10 @@ const Cash: React.FC = () => {
   });
 
   React.useEffect(() => {
-    if (activeTab === 'ARQUEOS') {
+    if (activeTab === 'ARQUEOS' || !session.isOpen) {
       fetchPastRegisters();
     }
-  }, [activeTab, fetchPastRegisters]);
+  }, [activeTab, session.isOpen, fetchPastRegisters]);
 
   // ──────────────────────────────────────────────────────────
   // Detailed financial calculations for the arqueo
@@ -117,51 +119,6 @@ const Cash: React.FC = () => {
     setTxData({ type: 'INGRESO', amount: '', description: '', method: 'EFECTIVO' });
   };
 
-  // ──────────────────────────────────────────────────────────
-  // Closed box screen
-  // ──────────────────────────────────────────────────────────
-  if (!session.isOpen) {
-    return (
-      <div className="p-8 h-[calc(100vh-64px)] flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="bg-white dark:bg-slate-900 p-12 rounded-[48px] shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full text-center space-y-8 animate-in zoom-in-95">
-          <div className="w-24 h-24 bg-blue-50 dark:bg-blue-500/10 text-blue-600 rounded-[32px] flex items-center justify-center mx-auto shadow-lg shadow-blue-500/10">
-            <Lock size={48} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Apertura de Caja</h1>
-            <p className="text-slate-500 font-medium italic">Inicia el turno para comenzar a registrar movimientos.</p>
-          </div>
-
-          <form onSubmit={handleOpen} className="space-y-6">
-            <div className="space-y-2 text-left">
-              <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Monto Inicial en Efectivo</label>
-              <div className="relative">
-                <span className="absolute left-6 top-5 text-slate-400 font-black text-xl">$</span>
-                <input 
-                  id="tour-cash-open-input"
-                  type="number"
-                  required
-                  placeholder="0.00"
-                  className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-blue-500 rounded-[24px] py-5 pl-12 pr-6 text-2xl font-black outline-none transition-all"
-                  value={openingAmount}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => setOpeningAmount(e.target.value)}
-                />
-              </div>
-            </div>
-            <button 
-              id="tour-cash-open-btn"
-              type="submit"
-              className="w-full bg-blue-600 text-white py-5 rounded-[24px] font-black text-xl hover:bg-blue-700 shadow-xl shadow-blue-600/20 active:scale-95 transition-all"
-            >
-              ABRIR TURNO
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="md:p-8 p-4 space-y-8 h-[calc(100vh-64px)] overflow-y-auto bg-slate-50 dark:bg-slate-950 scrollbar-hide">
 
@@ -169,140 +126,190 @@ const Cash: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-4xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-            Caja Registradora <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+            Caja Registradora <div className={`w-3 h-3 rounded-full ${session.isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
           </h1>
-          <div className="flex items-center gap-4 text-slate-500 mt-2 font-bold uppercase text-xs tracking-widest">
-            <div className="flex items-center gap-1"><Clock size={14}/> ABIERTO: {new Date(session.openedAt!).toLocaleTimeString()}</div>
-            <div className="flex items-center gap-1"><Banknote size={14}/> INICIO: ${session.openingBalance.toLocaleString()}</div>
-            <div className="flex items-center gap-1"><Receipt size={14}/> {saleCount} VENTA{saleCount !== 1 ? 'S' : ''}</div>
+          {session.isOpen ? (
+            <div className="flex items-center gap-4 text-slate-500 mt-2 font-bold uppercase text-xs tracking-widest">
+              <div className="flex items-center gap-1"><Clock size={14}/> ABIERTO: {new Date(session.openedAt!).toLocaleTimeString()}</div>
+              <div className="flex items-center gap-1"><Banknote size={14}/> INICIO: ${session.openingBalance.toLocaleString()}</div>
+              <div className="flex items-center gap-1"><Receipt size={14}/> {saleCount} VENTA{saleCount !== 1 ? 'S' : ''}</div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 text-slate-500 mt-2 font-bold uppercase text-xs tracking-widest">
+              <span className="bg-red-50 text-red-600 dark:bg-red-500/10 px-3 py-1 rounded-full text-xs font-black">CAJA CERRADA</span>
+            </div>
+          )}
+        </div>
+        {session.isOpen && (
+          <div className="flex gap-3 w-full md:w-auto flex-wrap" id="tour-cash-actions">
+            <button 
+              onClick={() => setIsTxModalOpen(true)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl"
+            >
+              <Wallet size={20} /> Movimiento
+            </button>
+            <button 
+              onClick={() => setShowArqueo(v => !v)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 px-6 py-4 rounded-2xl font-black hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all border border-indigo-100 dark:border-indigo-500/20"
+            >
+              <BookOpen size={20} /> Arqueo {showArqueo ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+            </button>
+            <button 
+              onClick={() => { if(confirm('¿Cerrar caja?')) closeBox(session.currentBalance) }}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-600 px-6 py-4 rounded-2xl font-black hover:bg-red-100 transition-all border border-red-100 dark:bg-red-500/10 dark:border-red-500/20"
+            >
+              <Unlock size={20} /> Cerrar Caja
+            </button>
           </div>
-        </div>
-        <div className="flex gap-3 w-full md:w-auto flex-wrap" id="tour-cash-actions">
-          <button 
-            onClick={() => setIsTxModalOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl"
-          >
-            <Wallet size={20} /> Movimiento
-          </button>
-          <button 
-            onClick={() => setShowArqueo(v => !v)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 px-6 py-4 rounded-2xl font-black hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all border border-indigo-100 dark:border-indigo-500/20"
-          >
-            <BookOpen size={20} /> Arqueo {showArqueo ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-          </button>
-          <button 
-            onClick={() => { if(confirm('¿Cerrar caja?')) closeBox(session.currentBalance) }}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-600 px-6 py-4 rounded-2xl font-black hover:bg-red-100 transition-all border border-red-100 dark:bg-red-500/10 dark:border-red-500/20"
-          >
-            <Unlock size={20} /> Cerrar Caja
-          </button>
-        </div>
-      </div>
-
-      {/* ── Top Stats Grid ── */}
-      <div id="tour-cash-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Efectivo en Caja" 
-          amount={session.currentBalance} 
-          icon={<Wallet size={20}/>} 
-          color="blue"
-          subtext="Saldo físico en cajón"
-        />
-        <StatCard 
-          title="Ventas Totales" 
-          amount={totalSales} 
-          icon={<TrendingUp size={20}/>} 
-          color="emerald"
-          subtext={`${saleCount} venta${saleCount !== 1 ? 's' : ''} realizadas`}
-        />
-        {!isEmployee && (
-          <StatCard 
-            title="Ganancia Estimada" 
-            amount={totalProfits} 
-            icon={<Activity size={20}/>} 
-            color="indigo"
-            subtext="Ventas − Costos"
-          />
         )}
-        <StatCard 
-          title="Gastos / Egresos" 
-          amount={totalExpenses} 
-          icon={<ArrowDownCircle size={20}/>} 
-          color="red"
-          subtext="Salidas de caja"
-        />
       </div>
 
-      {/* ── Payment Method Cards (detailed breakdown) ── */}
-      <div>
-        <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Recaudación por Medio de Pago</h2>
-        <div id="tour-cash-payments" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <PaymentCard title="Efectivo"       amount={salesCash}     icon={<Banknote size={22}/>}       colorKey="EFECTIVO" />
-          <PaymentCard title="Transferencia"  amount={totalTransfers} icon={<SendHorizontal size={22}/>} colorKey="TRANSFERENCIA" />
-          <PaymentCard title="Débito"         amount={totalDebit}    icon={<CreditCard size={22}/>}     colorKey="DEBITO" />
-          <PaymentCard title="Crédito"        amount={totalCredit}   icon={<CreditCard size={22}/>}     colorKey="CREDITO" />
-          <PaymentCard title="Cta. Corriente" amount={totalCC}       icon={<Activity size={22}/>}       colorKey="CUENTA_CORRIENTE" />
-        </div>
-      </div>
-
-      {/* ── Arqueo Detallado (expandible) ── */}
-      {showArqueo && (
-        <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-indigo-100 dark:border-indigo-500/20 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4">
-          <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500" />
-          <div className="p-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-100 dark:bg-indigo-500/20 rounded-2xl text-indigo-600">
-                <ShieldCheck size={22}/>
-              </div>
-              <div>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white">Arqueo de Caja</h2>
-                <p className="text-xs text-slate-400 font-semibold">Resumen detallado del turno actual</p>
-              </div>
+      {!session.isOpen ? (
+        <div className="flex justify-center py-4">
+          <div className="bg-white dark:bg-slate-900 p-10 rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full text-center space-y-6 animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-500/5">
+              <Lock size={32} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">Apertura de Caja</h2>
+              <p className="text-xs text-slate-500 font-medium italic mt-1">Inicia el turno para comenzar a registrar movimientos.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left: Ingresos */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ingresos del Turno</p>
-                <ArqueoRow label="Saldo Apertura"        amount={session.openingBalance}    color="text-slate-600 dark:text-slate-400" />
-                <ArqueoRow label="Ventas en Efectivo"    amount={salesCash}                 color="text-emerald-600" />
-                <ArqueoRow label="Ventas Transferencia"  amount={salesTransfer}             color="text-blue-600" />
-                <ArqueoRow label="Ventas Débito"         amount={salesDebit}                color="text-violet-600" />
-                <ArqueoRow label="Ventas Crédito"        amount={salesCredit}               color="text-pink-600" />
-                <ArqueoRow label="Ventas Cta. Corriente" amount={salesCC}                   color="text-orange-600" bold={false} italic />
-                <ArqueoRow label="Ingresos Manuales"     amount={manualIncomes}             color="text-emerald-500" />
-                <ArqueoRow label="Cobros de Deuda"       amount={debtPayments}              color="text-emerald-500" />
-                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                  <ArqueoRow label="TOTAL VENTAS + INGRESOS" amount={totalSales + manualIncomes + debtPayments} color="text-emerald-600" bold />
+            <form onSubmit={handleOpen} className="space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Monto Inicial en Efectivo</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-slate-400 font-black text-lg">$</span>
+                  <input 
+                    id="tour-cash-open-input"
+                    type="number"
+                    required
+                    placeholder="0.00"
+                    className="w-full bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-blue-500 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-black outline-none transition-all"
+                    value={openingAmount}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setOpeningAmount(e.target.value)}
+                  />
                 </div>
               </div>
-
-              {/* Right: Egresos + Resumen de Caja */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Egresos y Saldo Final</p>
-                <ArqueoRow label="Total Egresos"         amount={totalExpenses}             color="text-red-500" sign="-" />
-                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
-                  <ArqueoRow label="SALDO EFECTIVO ESPERADO" amount={session.currentBalance} color="text-blue-600" bold />
-                </div>
-
-                <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl space-y-3 border border-slate-100 dark:border-slate-800">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">No ingresa al cajón físico</p>
-                  <ArqueoRow label="Transferencias"      amount={totalTransfers}            color="text-blue-500" sign="=" />
-                  <ArqueoRow label="Débito"              amount={totalDebit}                color="text-violet-500" sign="=" />
-                  <ArqueoRow label="Crédito"             amount={totalCredit}               color="text-pink-500" sign="=" />
-                  <ArqueoRow label="Cta. Corriente"      amount={totalCC}                   color="text-orange-500" sign="=" italic />
-                </div>
-
-                {!isEmployee && (
-                  <div className="p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl border border-indigo-100 dark:border-indigo-500/20">
-                    <ArqueoRow label="Ganancia estimada" amount={totalProfits} color="text-indigo-600" bold />
-                    <p className="text-[10px] text-indigo-400 font-semibold mt-1">Precio venta − Costo productos</p>
-                  </div>
-                )}
-              </div>
-            </div>
+              <button 
+                id="tour-cash-open-btn"
+                type="submit"
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-base hover:bg-blue-700 shadow-xl shadow-blue-600/20 active:scale-95 transition-all"
+              >
+                ABRIR TURNO
+              </button>
+            </form>
           </div>
         </div>
+      ) : (
+        <>
+          {/* ── Top Stats Grid ── */}
+          <div id="tour-cash-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard 
+              title="Efectivo en Caja" 
+              amount={session.currentBalance} 
+              icon={<Wallet size={20}/>} 
+              color="blue"
+              subtext="Saldo físico en cajón"
+            />
+            <StatCard 
+              title="Ventas Totales" 
+              amount={totalSales} 
+              icon={<TrendingUp size={20}/>} 
+              color="emerald"
+              subtext={`${saleCount} venta${saleCount !== 1 ? 's' : ''} realizadas`}
+            />
+            {!isEmployee && (
+              <StatCard 
+                title="Ganancia Estimada" 
+                amount={totalProfits} 
+                icon={<Activity size={20}/>} 
+                color="indigo"
+                subtext="Ventas − Costos"
+              />
+            )}
+            <StatCard 
+              title="Gastos / Egresos" 
+              amount={totalExpenses} 
+              icon={<ArrowDownCircle size={20}/>} 
+              color="red"
+              subtext="Salidas de caja"
+            />
+          </div>
+
+          {/* ── Payment Method Cards (detailed breakdown) ── */}
+          <div>
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">Recaudación por Medio de Pago</h2>
+            <div id="tour-cash-payments" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <PaymentCard title="Efectivo"       amount={salesCash}     icon={<Banknote size={22}/>}       colorKey="EFECTIVO" />
+              <PaymentCard title="Transferencia"  amount={totalTransfers} icon={<SendHorizontal size={22}/>} colorKey="TRANSFERENCIA" />
+              <PaymentCard title="Débito"         amount={totalDebit}    icon={<CreditCard size={22}/>}     colorKey="DEBITO" />
+              <PaymentCard title="Crédito"        amount={totalCredit}   icon={<CreditCard size={22}/>}     colorKey="CREDITO" />
+              <PaymentCard title="Cta. Corriente" amount={totalCC}       icon={<Activity size={22}/>}       colorKey="CUENTA_CORRIENTE" />
+            </div>
+          </div>
+
+          {/* ── Arqueo Detallado (expandible) ── */}
+          {showArqueo && (
+            <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-indigo-100 dark:border-indigo-500/20 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4">
+              <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500" />
+              <div className="p-8 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-100 dark:bg-indigo-500/20 rounded-2xl text-indigo-600">
+                    <ShieldCheck size={22}/>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Arqueo de Caja</h2>
+                    <p className="text-xs text-slate-400 font-semibold">Resumen detallado del turno actual</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Ingresos */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ingresos del Turno</p>
+                    <ArqueoRow label="Saldo Apertura"        amount={session.openingBalance}    color="text-slate-600 dark:text-slate-400" />
+                    <ArqueoRow label="Ventas en Efectivo"    amount={salesCash}                 color="text-emerald-600" />
+                    <ArqueoRow label="Ventas Transferencia"  amount={salesTransfer}             color="text-blue-600" />
+                    <ArqueoRow label="Ventas Débito"         amount={salesDebit}                color="text-violet-600" />
+                    <ArqueoRow label="Ventas Crédito"        amount={salesCredit}               color="text-pink-600" />
+                    <ArqueoRow label="Ventas Cta. Corriente" amount={salesCC}                   color="text-orange-600" bold={false} italic />
+                    <ArqueoRow label="Ingresos Manuales"     amount={manualIncomes}             color="text-emerald-500" />
+                    <ArqueoRow label="Cobros de Deuda"       amount={debtPayments}              color="text-emerald-500" />
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                      <ArqueoRow label="TOTAL VENTAS + INGRESOS" amount={totalSales + manualIncomes + debtPayments} color="text-emerald-600" bold />
+                    </div>
+                  </div>
+
+                  {/* Right: Egresos + Resumen de Caja */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Egresos y Saldo Final</p>
+                    <ArqueoRow label="Total Egresos"         amount={totalExpenses}             color="text-red-500" sign="-" />
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
+                      <ArqueoRow label="SALDO EFECTIVO ESPERADO" amount={session.currentBalance} color="text-blue-600" bold />
+                    </div>
+
+                    <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-800/50 rounded-3xl space-y-3 border border-slate-100 dark:border-slate-800">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">No ingresa al cajón físico</p>
+                      <ArqueoRow label="Transferencias"      amount={totalTransfers}            color="text-blue-500" sign="=" />
+                      <ArqueoRow label="Débito"              amount={totalDebit}                color="text-violet-500" sign="=" />
+                      <ArqueoRow label="Crédito"             amount={totalCredit}               color="text-pink-500" sign="=" />
+                      <ArqueoRow label="Cta. Corriente"      amount={totalCC}                   color="text-orange-500" sign="=" italic />
+                    </div>
+
+                    {!isEmployee && (
+                      <div className="p-5 bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl border border-indigo-100 dark:border-indigo-500/20">
+                        <ArqueoRow label="Ganancia estimada" amount={totalProfits} color="text-indigo-600" bold />
+                        <p className="text-[10px] text-indigo-400 font-semibold mt-1">Precio venta − Costo productos</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Transactions & Arqueos History ── */}
@@ -451,7 +458,8 @@ const Cash: React.FC = () => {
                       method,
                       description: m.description,
                       timestamp: m.createdAt,
-                      profit: m.profit
+                      profit: m.profit,
+                      details: m.details
                     };
                   });
                   const cashSales = mappedRegTxs.filter((t: any) => t.type === 'VENTA' && t.method === 'EFECTIVO').reduce((s: number, t: any) => s + t.amount, 0);
@@ -464,7 +472,10 @@ const Cash: React.FC = () => {
                   return (
                     <div key={reg.id} className="border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 transition-all">
                       <div 
-                        onClick={() => setExpandedRegisterId(isExpanded ? null : reg.id)}
+                        onClick={() => {
+                          setExpandedRegisterId(isExpanded ? null : reg.id);
+                          setExpandedTxId(null);
+                        }}
                         className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition-all"
                       >
                         <div className="space-y-1">
@@ -512,44 +523,95 @@ const Cash: React.FC = () => {
                                 <th className="px-4 py-3">Descripción</th>
                                 <th className="px-4 py-3">Medio de Pago</th>
                                 <th className="px-4 py-3 text-right">Monto</th>
+                                <th className="px-4 py-3"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                               {mappedRegTxs.length === 0 ? (
                                 <tr>
-                                  <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-bold italic text-xs">No se registraron movimientos en este turno</td>
+                                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-bold italic text-xs">No se registraron movimientos en este turno</td>
                                 </tr>
                               ) : (
                                 mappedRegTxs.map((t: any) => {
                                   const tMeta = getMethod(t.method);
+                                  const isTxExpanded = expandedTxId === t.id;
                                   return (
-                                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                                      <td className="px-4 py-3.5 text-xs text-slate-500 font-bold">
-                                        {new Date(t.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                                      </td>
-                                      <td className="px-4 py-3.5">
-                                        <p className="font-bold text-slate-900 dark:text-white text-xs">{t.description}</p>
-                                        <span className={`inline-block text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 ${
-                                          t.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10'
-                                          : t.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
-                                          : t.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
-                                          : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
-                                        }`}>
-                                          {t.type}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3.5">
-                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${tMeta.bg} ${tMeta.color}`}>
-                                          {t.method === 'EFECTIVO' ? <Banknote size={10}/> 
-                                            : t.method === 'TRANSFERENCIA' ? <SendHorizontal size={10}/> 
-                                            : <CreditCard size={10}/>}
-                                          {tMeta.label}
-                                        </span>
-                                      </td>
-                                      <td className={`px-4 py-3.5 text-right font-black text-sm ${t.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
-                                        {t.type === 'EGRESO' ? '-' : '+'}${t.amount.toLocaleString()}
-                                      </td>
-                                    </tr>
+                                    <React.Fragment key={t.id}>
+                                      <tr 
+                                        onClick={() => setExpandedTxId(isTxExpanded ? null : t.id)}
+                                        className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors cursor-pointer ${isTxExpanded ? 'bg-blue-50/30 dark:bg-blue-500/5' : ''}`}
+                                      >
+                                        <td className="px-4 py-3.5 text-xs text-slate-500 font-bold">
+                                          {new Date(t.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                        </td>
+                                        <td className="px-4 py-3.5">
+                                          <p className="font-bold text-slate-900 dark:text-white text-xs">{t.description}</p>
+                                          <span className={`inline-block text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 ${
+                                            t.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10'
+                                            : t.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
+                                            : t.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
+                                            : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
+                                          }`}>
+                                            {t.type}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3.5">
+                                          <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${tMeta.bg} ${tMeta.color}`}>
+                                            {t.method === 'EFECTIVO' ? <Banknote size={10}/> 
+                                              : t.method === 'TRANSFERENCIA' ? <SendHorizontal size={10}/> 
+                                              : <CreditCard size={10}/>}
+                                            {tMeta.label}
+                                          </span>
+                                        </td>
+                                        <td className={`px-4 py-3.5 text-right font-black text-sm ${t.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                          {t.type === 'EGRESO' ? '-' : '+'}${t.amount.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3.5 text-right">
+                                          {isTxExpanded ? <ChevronUp size={14} className="text-slate-300 ml-auto" /> : <ChevronDown size={14} className="text-slate-300 ml-auto" />}
+                                        </td>
+                                      </tr>
+                                      {isTxExpanded && (
+                                        <tr className="bg-slate-50/30 dark:bg-slate-800/10 animate-in fade-in duration-300">
+                                          <td colSpan={5} className="px-4 py-4 border-t border-slate-100 dark:border-slate-800">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                              <div className="space-y-2">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
+                                                  <Package size={12} /> Detalle de Productos
+                                                </h4>
+                                                {t.details?.items ? (
+                                                  <div className="space-y-1">
+                                                    {t.details.items.map((prod: any, idx: number) => (
+                                                      <div key={idx} className="flex justify-between items-center p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                                        <div className="flex items-center gap-2">
+                                                          <div className="w-6 h-6 bg-slate-50 dark:bg-slate-900 rounded flex items-center justify-center text-[10px]">
+                                                            {idx + 1}
+                                                          </div>
+                                                          <div>
+                                                            <p className="font-bold text-xs text-slate-900 dark:text-white">{prod.name}</p>
+                                                            <p className="text-[9px] text-slate-500">Cantidad: {prod.quantity}</p>
+                                                          </div>
+                                                        </div>
+                                                        <p className="font-black text-xs text-blue-600">${(prod.price * prod.quantity).toLocaleString()}</p>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  <p className="text-xs italic text-slate-400">Sin detalles adicionales registrados.</p>
+                                                )}
+                                              </div>
+                                              <div className="space-y-2">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Notas</h4>
+                                                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 min-h-[60px]">
+                                                  <p className="text-xs text-slate-600 dark:text-slate-300 italic">
+                                                    {t.details?.note || "Sin notas registradas para esta operación."}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
                                   );
                                 })
                               )}
