@@ -26,7 +26,7 @@ const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
   const { businessInfo } = useSettingsStore();
   const { products, loading: inventoryLoading } = useInventoryStore();
-  const { history, fetchHistory, loading: cashLoading } = useCashStore();
+  const { session, history, fetchHistory, loading: cashLoading } = useCashStore();
   const { customers, loading: customerLoading } = useCustomerStore();
   const navigate = useNavigate();
 
@@ -72,16 +72,18 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
-  const salesToday = history.filter(t => {
-    if (t.type !== 'VENTA') return false;
-    try {
-      const dateStr = new Date(t.timestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-      const todayStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-      return dateStr === todayStr;
-    } catch (e) {
-      return false;
-    }
-  }).reduce((s, t) => s + t.amount, 0);
+  const salesToday = session.isOpen 
+    ? session.transactions.filter(t => t.type === 'VENTA').reduce((s, t) => s + t.amount, 0)
+    : history.filter(t => {
+        if (t.type !== 'VENTA') return false;
+        try {
+          const dateStr = new Date(t.timestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+          const todayStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+          return dateStr === todayStr;
+        } catch (e) {
+          return false;
+        }
+      }).reduce((s, t) => s + t.amount, 0);
   const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
   
   // Real Database Subscription Details

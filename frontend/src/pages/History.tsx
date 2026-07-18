@@ -19,7 +19,7 @@ const History: React.FC = () => {
   const { history, fetchHistory, loading } = useCashStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'EGRESO' | 'SISTEMA'>('TODOS');
-  const [filterPeriod, setFilterPeriod] = useState<'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('MES');
+  const [filterPeriod, setFilterPeriod] = useState<'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('HOY');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   React.useEffect(() => {
@@ -36,7 +36,9 @@ const History: React.FC = () => {
     
     let matchesPeriod = true;
     if (filterPeriod === 'HOY') {
-      matchesPeriod = itemDate.toDateString() === now.toDateString();
+      const dateStr = itemDate.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const todayStr = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      matchesPeriod = dateStr === todayStr;
     } else if (filterPeriod === 'SEMANA') {
       const diffTime = Math.abs(now.getTime() - itemDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
