@@ -83,10 +83,10 @@ const History: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div id="tour-hist-summary" className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-300 ${loading ? 'opacity-60 animate-pulse pointer-events-none' : ''}`}>
-        <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" />
-        <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" />
-        <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" />
+      <div id="tour-hist-summary" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" isLoading={loading && history.length === 0} />
+        <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" isLoading={loading && history.length === 0} />
+        <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" isLoading={loading && history.length === 0} />
       </div>
 
       {/* Period Filter Tabs */}
@@ -281,7 +281,7 @@ const History: React.FC = () => {
   );
 };
 
-const SummaryCard = ({ title, amount, icon, color }: any) => {
+const SummaryCard = ({ title, amount, icon, color, isLoading }: any) => {
   const styles: any = {
     emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 border-emerald-100 dark:border-emerald-500/20',
     red: 'bg-red-50 dark:bg-red-500/10 text-red-600 border-red-100 dark:border-red-500/20',
@@ -291,9 +291,13 @@ const SummaryCard = ({ title, amount, icon, color }: any) => {
   return (
     <div className={`p-6 rounded-[32px] border ${styles[color]} flex items-center gap-4 shadow-sm`}>
       <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl shadow-sm">{icon}</div>
-      <div>
+      <div className="flex-1 min-w-0">
         <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">{title}</p>
-        <h3 className="text-2xl font-black tracking-tight">${amount.toLocaleString()}</h3>
+        {isLoading ? (
+          <div className="h-8 w-24 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-lg mt-1"></div>
+        ) : (
+          <h3 className="text-2xl font-black tracking-tight">${amount.toLocaleString()}</h3>
+        )}
       </div>
     </div>
   );

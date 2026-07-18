@@ -169,7 +169,6 @@ export const useCashStore = create<CashState>((set, get) => ({
             currentBalance,
             transactions: mappedTransactions,
           },
-          history: mappedTransactions,
           loading: false,
         });
       } else {
