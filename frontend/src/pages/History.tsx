@@ -188,9 +188,13 @@ const History: React.FC = () => {
                           item.type === 'VENTA' ? 'bg-blue-100 text-blue-600' : 
                           item.type === 'PAGO_DEUDA' ? 'bg-orange-100 text-orange-600' :
                           item.type === 'EGRESO' ? 'bg-red-100 text-red-600' : 
+                          item.description.toLowerCase().includes('apertura') ? 'bg-emerald-100 text-emerald-600' :
+                          item.description.toLowerCase().includes('cierre') ? 'bg-red-100 text-red-600' :
                           'bg-slate-100 text-slate-600'
                         }`}>
-                          {item.type}
+                          {item.description.toLowerCase().includes('apertura') ? 'APERTURA' : 
+                           item.description.toLowerCase().includes('cierre') ? 'CIERRE' : 
+                           item.type}
                         </span>
                         <p className="text-[10px] text-slate-400 font-mono mt-1">#{item.id}</p>
                       </td>
@@ -207,10 +211,10 @@ const History: React.FC = () => {
                         </div>
                       </td>
                       <td className={`px-8 py-5 text-right font-black text-lg ${
-                        item.type === 'EGRESO' ? 'text-red-500' : 
-                        item.type === 'VENTA' || item.type === 'PAGO_DEUDA' ? 'text-emerald-500' : 'text-slate-900 dark:text-white'
+                        item.type === 'EGRESO' || item.description.toLowerCase().includes('cierre') ? 'text-red-500' : 
+                        item.type === 'VENTA' || item.type === 'PAGO_DEUDA' || item.description.toLowerCase().includes('apertura') ? 'text-emerald-500' : 'text-slate-900 dark:text-white'
                       }`}>
-                        {item.type === 'EGRESO' ? '-' : '+'}${item.amount.toLocaleString()}
+                        {item.type === 'EGRESO' || item.description.toLowerCase().includes('cierre') ? '-' : '+'}${item.amount.toLocaleString()}
                       </td>
                       <td className="px-8 py-5 text-right">
                         {expandedRow === item.id ? <ChevronUp className="text-slate-300 ml-auto" /> : <ChevronDown className="text-slate-300 ml-auto" />}

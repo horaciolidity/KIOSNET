@@ -373,10 +373,14 @@ const Cash: React.FC = () => {
                             tx.type === 'EGRESO' ? 'bg-red-50 text-red-500 dark:bg-red-500/10' 
                             : tx.type === 'VENTA' ? 'bg-blue-50 text-blue-500 dark:bg-blue-500/10'
                             : tx.type === 'PAGO_DEUDA' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10'
+                            : tx.description.toLowerCase().includes('apertura') ? 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
+                            : tx.description.toLowerCase().includes('cierre') ? 'bg-red-50 text-red-500 dark:bg-red-500/10'
                             : tx.type === 'SISTEMA' ? 'bg-slate-100 text-slate-400 dark:bg-slate-800'
                             : 'bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10'
                           }`}>
-                            {tx.type === 'PAGO_DEUDA' ? 'Cobro Deuda' : tx.type}
+                            {tx.description.toLowerCase().includes('apertura') ? 'APERTURA'
+                             : tx.description.toLowerCase().includes('cierre') ? 'CIERRE'
+                             : tx.type === 'PAGO_DEUDA' ? 'Cobro Deuda' : tx.type}
                           </span>
                         </td>
                         <td className="px-8 py-4">
@@ -396,8 +400,10 @@ const Cash: React.FC = () => {
                             )}
                           </td>
                         )}
-                        <td className={`px-8 py-4 text-right font-black text-lg ${tx.type === 'EGRESO' ? 'text-red-500' : 'text-emerald-500'}`}>
-                          {tx.type === 'EGRESO' ? '-' : '+'}${tx.amount.toLocaleString()}
+                        <td className={`px-8 py-4 text-right font-black text-lg ${
+                          tx.type === 'EGRESO' || tx.description.toLowerCase().includes('cierre') ? 'text-red-500' : 'text-emerald-500'
+                        }`}>
+                          {tx.type === 'EGRESO' || tx.description.toLowerCase().includes('cierre') ? '-' : '+'}${tx.amount.toLocaleString()}
                         </td>
                       </tr>
                     );
