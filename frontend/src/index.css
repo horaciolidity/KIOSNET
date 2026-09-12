@@ -34,7 +34,7 @@
   --radius-sm: calc(var(--radius) - 4px);
 }
 
-@variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {

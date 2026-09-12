@@ -24,6 +24,7 @@ const SubscriptionPay: React.FC = () => {
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
   const [paymentSessionStart, setPaymentSessionStart] = useState<number>(Date.now());
+  const [transferAlias, setTransferAlias] = useState<string>('horacio.asa');
 
   // Helper to verify and activate payment directly from client side
   const checkAndActivatePayment = async (plan: 'STANDARD' | 'PRO', months: number, paymentId?: string | null) => {
@@ -194,6 +195,7 @@ const SubscriptionPay: React.FC = () => {
           const val = Number(cfg.value);
           if (cfg.key === 'price_standard' && !isNaN(val)) priceStandard = val;
           if (cfg.key === 'price_pro' && !isNaN(val)) pricePro = val;
+          if (cfg.key === 'transfer_alias' && cfg.value) setTransferAlias(cfg.value);
         });
 
         setPrices({
@@ -790,7 +792,7 @@ const SubscriptionPay: React.FC = () => {
                   ¿Ya realizaste la transferencia?
                 </p>
                 <p className="text-slate-400 text-xs mt-1">
-                  Si pagaste por transferencia bancaria al alias <strong className="text-blue-400 font-mono">horacio.asa</strong> o por cualquier otro medio, notificá al administrador para que active tu cuenta.
+                  Si pagaste por transferencia bancaria al alias <strong className="text-blue-400 font-mono">{transferAlias}</strong> o por cualquier otro medio, notificá al administrador para que active tu cuenta.
                 </p>
               </div>
               <button
