@@ -574,6 +574,20 @@ const POS: React.FC = () => {
               className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 px-12 text-lg font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                  // Buscar coincidencia exacta por código de barras
+                  const exactMatch = products.find(p => p.barcode === searchTerm.trim());
+                  if (exactMatch) {
+                    addToCart(exactMatch);
+                    setSearchTerm('');
+                  } else if (filteredProducts.length === 1) {
+                    // Si no hay por código pero la búsqueda dejó solo 1 producto, lo agregamos
+                    addToCart(filteredProducts[0]);
+                    setSearchTerm('');
+                  }
+                }
+              }}
             />
             <div className="absolute right-4 top-3.5 p-1 bg-blue-600 rounded-lg text-white">
               <ScanBarcode size={20} />
