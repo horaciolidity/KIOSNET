@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { Lock, Mail, Loader2, Store, User, ArrowRight, TrendingUp, Package, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, Loader2, Store, User, ArrowRight, Gift, Headphones, Users, Monitor, Printer, Package } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 
 const Login: React.FC = () => {
@@ -203,58 +203,83 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-white font-sans relative overflow-hidden">
+    <div className="min-h-screen flex bg-zinc-950 text-white font-sans relative overflow-hidden">
       
       {/* Left Side: Marketing / Branding (hidden on mobile) */}
       <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 relative items-center justify-center p-12 overflow-hidden border-r border-white/5">
         {/* Background gradients for the left side */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-950 to-slate-950 z-0"></div>
-        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/20 rounded-full blur-[120px] z-0"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-zinc-950 to-slate-900 z-0"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-emerald-600/10 rounded-full blur-[120px] z-0"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/15 rounded-full blur-[100px] z-0"></div>
         
-        <div className="relative z-10 max-w-lg">
+        <div className="relative z-10 w-full max-w-lg">
           <div className="flex items-center gap-4 mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/20 shadow-2xl shadow-blue-500/20 overflow-hidden p-1 backdrop-blur-md">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-zinc-900/80 border border-white/10 shadow-2xl shadow-indigo-500/20 overflow-hidden p-1 backdrop-blur-md">
               <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-[14px]" />
             </div>
-            <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-indigo-200 to-white bg-clip-text text-transparent uppercase">KIOSNET</h2>
+            <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-indigo-300 to-white bg-clip-text text-transparent uppercase">KIOSNET</h2>
           </div>
           
-          <h1 className="text-4xl xl:text-5xl font-black tracking-tight mb-6 text-white leading-[1.1]">
-            El control total de tu comercio, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">en la nube.</span>
+          <h1 className="text-4xl xl:text-5xl font-black tracking-tight mb-4 text-white leading-[1.1]">
+            El control total de tu comercio, <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-400">en la nube.</span>
           </h1>
-          <p className="text-lg xl:text-xl text-slate-400 mb-10 leading-relaxed font-medium">
-            Sistema de gestión y punto de venta definitivo para maximizar tus ganancias, diseñado especialmente para kioscos y minimercados.
+          <p className="text-lg text-zinc-400 mb-8 leading-relaxed font-medium">
+            El sistema de gestión y punto de venta definitivo. Simple, rápido y seguro.
           </p>
           
-          <div className="space-y-6">
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20">
-                <TrendingUp className="w-6 h-6 text-blue-400" />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* 1. 50 ventas gratuitas */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors relative overflow-hidden group">
+              <div className="absolute top-0 right-0 px-2 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-bl-lg shadow-sm">¡GRATIS!</div>
+              <Gift className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition-transform" />
               <div>
-                <h3 className="text-lg font-bold text-white mb-1">Ventas ultra rápidas</h3>
-                <p className="text-slate-400 text-sm">Factura en segundos con atajos de teclado y escáner de código de barras. Mantén la fila en movimiento.</p>
+                <h3 className="text-sm font-bold text-emerald-300">50 Ventas de Prueba</h3>
+                <p className="text-emerald-400/80 text-xs">Sin tarjeta de crédito</p>
+              </div>
+            </div>
+
+            {/* 2. Mayoristas */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
+              <Package className="w-6 h-6 text-blue-400 group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Minorista y Mayorista</h3>
+                <p className="text-zinc-400 text-xs">Multilista de precios</p>
               </div>
             </div>
             
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-500/20">
-                <Package className="w-6 h-6 text-indigo-400" />
-              </div>
+            {/* 3. Lector e Impresora */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
+              <Printer className="w-6 h-6 text-indigo-400 group-hover:scale-110 transition-transform" />
               <div>
-                <h3 className="text-lg font-bold text-white mb-1">Control de Stock exacto</h3>
-                <p className="text-slate-400 text-sm">Sabe exactamente qué tienes y qué necesitas reponer. Recibe alertas de stock bajo al instante.</p>
+                <h3 className="text-sm font-bold text-white">Hardware 100% Compatible</h3>
+                <p className="text-zinc-400 text-xs">Lectora y ticketera 80mm</p>
               </div>
             </div>
-            
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                <ShieldCheck className="w-6 h-6 text-emerald-400" />
-              </div>
+
+            {/* 4. Pantalla Cliente */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
+              <Monitor className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
               <div>
-                <h3 className="text-lg font-bold text-white mb-1">Seguridad y Respaldo</h3>
-                <p className="text-slate-400 text-sm">Tus datos seguros en la nube. Accede desde tu celular, tablet o PC en cualquier momento y lugar.</p>
+                <h3 className="text-sm font-bold text-white">Pantalla de Cliente</h3>
+                <p className="text-zinc-400 text-xs">Más transparencia al cobrar</p>
+              </div>
+            </div>
+
+            {/* 5. Empleados */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
+              <Users className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Gestión de Empleados</h3>
+                <p className="text-zinc-400 text-xs">Control de turnos y permisos</p>
+              </div>
+            </div>
+
+            {/* 6. Soporte */}
+            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors group">
+              <Headphones className="w-6 h-6 text-amber-400 group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Soporte Técnico 24/7</h3>
+                <p className="text-zinc-400 text-xs">Siempre listos para ayudarte</p>
               </div>
             </div>
           </div>
