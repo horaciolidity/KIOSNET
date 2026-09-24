@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { Lock, Mail, Loader2, Store, User, ArrowRight } from 'lucide-react';
+import { Lock, Mail, Loader2, Store, User, ArrowRight, TrendingUp, Package, ShieldCheck } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 
 const Login: React.FC = () => {
@@ -203,191 +203,262 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white font-sans relative overflow-hidden">
-      {/* Background visual graphics */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-600/15 rounded-full blur-[130px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-indigo-600/15 rounded-full blur-[130px]"></div>
+    <div className="min-h-screen flex bg-slate-950 text-white font-sans relative overflow-hidden">
+      
+      {/* Left Side: Marketing / Branding (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 relative items-center justify-center p-12 overflow-hidden border-r border-white/5">
+        {/* Background gradients for the left side */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-950 to-slate-950 z-0"></div>
+        <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/20 rounded-full blur-[120px] z-0"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/15 rounded-full blur-[100px] z-0"></div>
+        
+        <div className="relative z-10 max-w-lg">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/20 shadow-2xl shadow-blue-500/20 overflow-hidden p-1 backdrop-blur-md">
+              <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-[14px]" />
+            </div>
+            <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-indigo-200 to-white bg-clip-text text-transparent uppercase">KIOSNET</h2>
+          </div>
+          
+          <h1 className="text-4xl xl:text-5xl font-black tracking-tight mb-6 text-white leading-[1.1]">
+            El control total de tu comercio, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">en la nube.</span>
+          </h1>
+          <p className="text-lg xl:text-xl text-slate-400 mb-10 leading-relaxed font-medium">
+            Sistema de gestión y punto de venta definitivo para maximizar tus ganancias, diseñado especialmente para kioscos y minimercados.
+          </p>
+          
+          <div className="space-y-6">
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20">
+                <TrendingUp className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Ventas ultra rápidas</h3>
+                <p className="text-slate-400 text-sm">Factura en segundos con atajos de teclado y escáner de código de barras. Mantén la fila en movimiento.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                <Package className="w-6 h-6 text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Control de Stock exacto</h3>
+                <p className="text-slate-400 text-sm">Sabe exactamente qué tienes y qué necesitas reponer. Recibe alertas de stock bajo al instante.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Seguridad y Respaldo</h3>
+                <p className="text-slate-400 text-sm">Tus datos seguros en la nube. Accede desde tu celular, tablet o PC en cualquier momento y lugar.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="w-full max-w-md p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl relative z-10 my-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-slate-900/80 border border-white/20 shadow-2xl shadow-blue-500/20 mb-4 overflow-hidden p-1 backdrop-blur-md">
-            <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-[20px]" />
-          </div>
-          <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-indigo-200 to-white bg-clip-text text-transparent uppercase">KIOSNET</h1>
-          <p className="text-slate-400 mt-2 font-medium">
-            {isRegistering ? 'Registra tu Comercio en la Nube' : 'Sistema de Gestión Profesional'}
-          </p>
+      {/* Right Side: Form */}
+      <div className="w-full lg:w-7/12 xl:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
+        {/* Background visual graphics for mobile */}
+        <div className="absolute inset-0 overflow-hidden lg:hidden">
+          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/15 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/15 rounded-full blur-[100px]"></div>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
-            {error}
+        <div className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl relative z-10 p-8 sm:p-10">
+          <div className="text-center mb-8">
+            <div className="lg:hidden inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/20 shadow-2xl shadow-blue-500/20 mb-4 overflow-hidden p-1 backdrop-blur-md">
+              <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-[14px]" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+              {isRegistering ? 'Crea tu cuenta' : 'Bienvenido de nuevo'}
+            </h2>
+            <p className="text-slate-400 text-sm">
+              {isRegistering ? 'Empieza a gestionar tu negocio de forma inteligente.' : 'Ingresa a tu panel de control KIOSNET.'}
+            </p>
           </div>
-        )}
 
-        {success && (
-          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm text-center">
-            {success}
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center font-medium">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm text-center font-medium">
+              {success}
+            </div>
+          )}
+
+          {isRegistering ? (
+            /* REGISTRATION FORM */
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Nombre del Comercio</label>
+                <div className="relative">
+                  <Store className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder="Ej. Kiosco El Sol"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Tu Nombre</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Juan Pérez"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="juan@ejemplo.com"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Contraseña</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-4 cursor-pointer"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Comenzar Gratis
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-4">
+                <p className="text-sm text-slate-400">
+                  ¿Ya tienes una cuenta?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegistering(false);
+                      setError('');
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Inicia Sesión
+                  </button>
+                </p>
+              </div>
+            </form>
+          ) : (
+            /* LOGIN FORM */
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@email.com"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Contraseña</label>
+                  <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">¿Olvidaste tu contraseña?</a>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-2 cursor-pointer"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Entrar al Sistema
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-4">
+                <p className="text-sm text-slate-400">
+                  ¿Eres nuevo?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegistering(true);
+                      setError('');
+                    }}
+                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                  >
+                    Registra tu comercio
+                  </button>
+                </p>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-8 text-center text-slate-500 text-xs pt-6">
+            <p>© 2026 KIOSNET. Todos los derechos reservados.</p>
           </div>
-        )}
-
-        {isRegistering ? (
-          /* REGISTRATION FORM */
-          <form onSubmit={handleRegister} className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400 ml-1">Nombre del Comercio</label>
-              <div className="relative">
-                <Store className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  placeholder="Mi Kiosko / Kiosco Express"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400 ml-1">Nombre del Dueño (Admin)</label>
-              <div className="relative">
-                <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Juan Pérez"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400 ml-1">Email de Acceso</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="juan@email.com"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400 ml-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-2 cursor-pointer"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Registrar mi Comercio
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-
-            <div className="text-center pt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(false);
-                  setError('');
-                }}
-                className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-              >
-                ¿Ya tienes una cuenta? Iniciar Sesión
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* LOGIN FORM */
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 cursor-pointer"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Entrar al Sistema
-                </>
-              )}
-            </button>
-
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(true);
-                  setError('');
-                }}
-                className="text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-              >
-                ¿Eres nuevo? Registrar mi comercio (Dueño)
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div className="mt-8 text-center text-slate-400 text-xs border-t border-white/5 pt-6">
-          <p className="text-slate-600">© 2026 KIOSNET. Todos los derechos reservados.</p>
         </div>
       </div>
     </div>
