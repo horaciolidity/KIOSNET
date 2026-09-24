@@ -286,24 +286,85 @@ const Login: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Side: Form */}
-      <div className="w-full lg:w-7/12 xl:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
+      {/* Right Side: Form & Mobile Marketing Header */}
+      <div className="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-center items-center p-4 sm:p-8 lg:p-12 relative overflow-y-auto min-h-screen lg:min-h-0">
         {/* Background visual graphics for mobile */}
-        <div className="absolute inset-0 overflow-hidden lg:hidden">
-          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600/15 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-indigo-600/15 rounded-full blur-[100px]"></div>
+        <div className="absolute inset-0 overflow-hidden lg:hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[50%] bg-emerald-600/15 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[50%] bg-indigo-600/15 rounded-full blur-[100px]"></div>
         </div>
 
-        <div className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl relative z-10 p-8 sm:p-10">
-          <div className="text-center mb-8">
-            <div className="lg:hidden inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-white/20 shadow-2xl shadow-blue-500/20 mb-4 overflow-hidden p-1 backdrop-blur-md">
-              <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-[14px]" />
+        {/* Mobile Top Marketing Hero (visible only on mobile/tablet < lg) */}
+        <div className="w-full max-w-md lg:hidden mb-6 relative z-10 text-center space-y-4 pt-4 sm:pt-0">
+          {/* Brand Logo & Name */}
+          <div className="inline-flex items-center gap-3 bg-zinc-900/80 border border-white/10 px-4 py-2 rounded-2xl shadow-xl backdrop-blur-md">
+            <div className="w-8 h-8 rounded-xl bg-zinc-900 overflow-hidden p-0.5 border border-white/10">
+              <img src="/kiosnet_logo.png" alt="KIOSNET Logo" className="w-full h-full object-cover rounded-lg" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-              {isRegistering ? 'Crea tu cuenta' : 'Bienvenido de nuevo'}
+            <span className="text-xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-indigo-300 to-white bg-clip-text text-transparent uppercase">
+              KIOSNET
+            </span>
+          </div>
+
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
+              Controla tu comercio <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-400">en la nube</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1 font-medium">
+              El sistema de gestión y punto de venta definitivo.
+            </p>
+          </div>
+
+          {/* 50 Free Sales Hero Callout Banner for Mobile */}
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-emerald-600/10 to-indigo-500/20 border border-emerald-500/40 backdrop-blur-md shadow-lg shadow-emerald-950/40 text-left flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500 text-zinc-950 shrink-0 font-extrabold shadow-md">
+              <Gift className="w-5 h-5 text-zinc-950" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-emerald-300 uppercase tracking-wider">¡PRUEBA GRATUITA!</span>
+                <span className="px-1.5 py-0.5 bg-emerald-500/30 text-emerald-300 text-[10px] font-bold rounded-md">Sin Tarjeta</span>
+              </div>
+              <p className="text-xs font-bold text-white truncate">50 Ventas Gratis de Regalo</p>
+              <p className="text-[11px] text-zinc-300">Crea tu cuenta en 30 segundos y empieza ya.</p>
+            </div>
+          </div>
+
+          {/* Horizontal scrollable Feature Badges */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none text-left -mx-1 px-1">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 shrink-0 text-xs font-semibold text-zinc-200">
+              <Package className="w-4 h-4 text-blue-400" />
+              <span>Minorista y Mayorista</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 shrink-0 text-xs font-semibold text-zinc-200">
+              <Printer className="w-4 h-4 text-indigo-400" />
+              <span>Lectora + Ticketera 80mm</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 shrink-0 text-xs font-semibold text-zinc-200">
+              <Monitor className="w-4 h-4 text-purple-400" />
+              <span>Pantalla Cliente</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 shrink-0 text-xs font-semibold text-zinc-200">
+              <Users className="w-4 h-4 text-pink-400" />
+              <span>Gestión Empleados</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/80 border border-white/10 shrink-0 text-xs font-semibold text-zinc-200">
+              <Headphones className="w-4 h-4 text-amber-400" />
+              <span>Soporte 24/7</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Form Container Card */}
+        <div className="w-full max-w-md bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl shadow-black/80 relative z-10 p-6 sm:p-10">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 tracking-tight">
+              {isRegistering ? 'Crea tu cuenta gratis' : 'Bienvenido de nuevo'}
             </h2>
-            <p className="text-slate-400 text-sm">
-              {isRegistering ? 'Empieza a gestionar tu negocio de forma inteligente.' : 'Ingresa a tu panel de control KIOSNET.'}
+            <p className="text-zinc-400 text-xs sm:text-sm">
+              {isRegistering 
+                ? 'Ingresa tus datos y activa tus 50 ventas sin cargo.' 
+                : 'Ingresa a tu panel de control KIOSNET.'}
             </p>
           </div>
 
@@ -323,60 +384,60 @@ const Login: React.FC = () => {
             /* REGISTRATION FORM */
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Nombre del Comercio</label>
+                <label className="text-xs font-semibold text-zinc-400 ml-1 uppercase tracking-wider">Nombre del Comercio</label>
                 <div className="relative">
-                  <Store className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Store className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="text"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
                     placeholder="Ej. Kiosco El Sol"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Tu Nombre</label>
+                <label className="text-xs font-semibold text-zinc-400 ml-1 uppercase tracking-wider">Tu Nombre</label>
                 <div className="relative">
-                  <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <User className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Juan Pérez"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Email</label>
+                <label className="text-xs font-semibold text-zinc-400 ml-1 uppercase tracking-wider">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="juan@ejemplo.com"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Contraseña</label>
+                <label className="text-xs font-semibold text-zinc-400 ml-1 uppercase tracking-wider">Contraseña</label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
@@ -385,20 +446,20 @@ const Login: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-4 cursor-pointer"
+                className="w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-zinc-950 font-black py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-4 cursor-pointer text-base uppercase tracking-wider"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin text-zinc-950" />
                 ) : (
                   <>
-                    Comenzar Gratis
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    Comenzar 50 Ventas Gratis
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </button>
 
-              <div className="text-center pt-4">
-                <p className="text-sm text-slate-400">
+              <div className="text-center pt-3">
+                <p className="text-sm text-zinc-400">
                   ¿Ya tienes una cuenta?{' '}
                   <button
                     type="button"
@@ -406,7 +467,7 @@ const Login: React.FC = () => {
                       setIsRegistering(false);
                       setError('');
                     }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                    className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
                   >
                     Inicia Sesión
                   </button>
@@ -417,15 +478,15 @@ const Login: React.FC = () => {
             /* LOGIN FORM */
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400 ml-1 uppercase tracking-wider">Email</label>
+                <label className="text-xs font-semibold text-zinc-400 ml-1 uppercase tracking-wider">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
@@ -433,17 +494,17 @@ const Login: React.FC = () => {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between ml-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Contraseña</label>
-                  <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">¿Olvidaste tu contraseña?</a>
+                  <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Contraseña</label>
+                  <a href="#" className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">¿Olvidaste tu contraseña?</a>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Lock className="absolute left-4 top-3.5 w-5 h-5 text-zinc-500" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm"
+                    className="w-full bg-zinc-950/80 border border-white/10 rounded-xl py-3 px-12 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all text-sm"
                     required
                   />
                 </div>
@@ -452,36 +513,37 @@ const Login: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-2 cursor-pointer"
+                className="w-full bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-zinc-950 font-black py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 group disabled:opacity-70 mt-2 cursor-pointer text-base uppercase tracking-wider"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin text-zinc-950" />
                 ) : (
                   <>
                     Entrar al Sistema
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </button>
 
-              <div className="text-center pt-4">
-                <p className="text-sm text-slate-400">
-                  ¿Eres nuevo?{' '}
+              <div className="text-center pt-3">
+                <p className="text-sm text-zinc-400">
+                  ¿Eres nuevo en KIOSNET?{' '}
                   <button
                     type="button"
                     onClick={() => {
                       setIsRegistering(true);
                       setError('');
                     }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+                    className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
                   >
-                    Registra tu comercio
+                    Registra tu comercio gratis
                   </button>
                 </p>
               </div>
             </form>
           )}
 
-          <div className="mt-8 text-center text-slate-500 text-xs pt-6">
+          <div className="mt-6 text-center text-zinc-500 text-xs border-t border-white/5 pt-4">
             <p>© 2026 KIOSNET. Todos los derechos reservados.</p>
           </div>
         </div>
