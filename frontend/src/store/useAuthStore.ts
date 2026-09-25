@@ -26,12 +26,16 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       setAuth: (user, token) => set({ user, token }),
       logout: async () => {
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.error('Error signing out from Supabase:', e);
+        }
         set({ user: null, token: null });
       },
       setSubscriptionActive: (active) => set((state) => {
@@ -44,8 +48,12 @@ export const useAuthStore = create<AuthState>()(
         };
       }),
       fetchUserSession: async () => {
+        const currentUser = get().user;
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session || !session.user) {
+        
+        // Use session user ID or fall back to persisted local user ID
+        const userId = session?.user?.id || currentUser?.id;
+        if (!userId) {
           set({ user: null, token: null });
           return;
         }
@@ -55,11 +63,12 @@ export const useAuthStore = create<AuthState>()(
           const { data: dbUser, error: dbUserError } = await supabase
             .from('User')
             .select('id, email, name, role, tenantId, onboardingCompleted')
-            .eq('id', session.user.id)
+            .eq('id', userId)
             .single();
 
           if (dbUserError || !dbUser) {
             console.error('Profile not found for session user:', dbUserError);
+            // Don't nuke auth state if network transient error happens when user is logged in
             return;
           }
 
@@ -92,7 +101,7 @@ export const useAuthStore = create<AuthState>()(
               salesCount: count || 0,
               onboardingCompleted: dbUser.onboardingCompleted || false
             },
-            token: session.access_token
+            token: session?.access_token || get().token || ''
           });
         } catch (e) {
           console.error('Error fetching user profile:', e);
