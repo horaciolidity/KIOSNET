@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import type { ScaleConfig } from '../services/scaleService';
+
 export type SubscriptionPlan = 'FREE' | 'STANDARD' | 'PRO';
 
 interface BusinessInfo {
@@ -41,11 +43,13 @@ interface SettingsState {
     employeeBlockInventory: boolean;
     employeeBlockCash: boolean;
   };
+  scaleConfig: ScaleConfig;
   setBusinessInfo: (info: BusinessInfo) => void;
   updateBusinessInfo: (info: Partial<BusinessInfo>) => void;
   updateNotifications: (notif: Partial<SettingsState['notifications']>) => void;
   updateDisplay: (disp: Partial<SettingsState['display']>) => void;
   updateSecurity: (sec: Partial<SettingsState['security']>) => void;
+  updateScaleConfig: (cfg: Partial<ScaleConfig>) => void;
   incrementSales: () => void;
   upgradePlan: (plan: SubscriptionPlan, cost: number) => void;
   deductDailyBalance: () => void;
@@ -88,11 +92,28 @@ export const useSettingsStore = create<SettingsState>()(
         employeeBlockInventory: true,
         employeeBlockCash: true
       },
+      scaleConfig: {
+        enabled: false,
+        mode: 'BOTH',
+        directConfig: {
+          connectionType: 'WEB_SERIAL',
+          baudRate: 9600,
+          protocol: 'SYSTEL_KRETZ',
+          autoConnect: false,
+        },
+        barcodeConfig: {
+          prefix: '20',
+          valueType: 'WEIGHT_GRAMS',
+          codeLength: 5,
+          valueLength: 5,
+        }
+      },
       setBusinessInfo: (businessInfo) => set({ businessInfo }),
       updateBusinessInfo: (info) => set((state) => ({ businessInfo: { ...state.businessInfo, ...info } })),
       updateNotifications: (notif) => set((state) => ({ notifications: { ...state.notifications, ...notif } })),
       updateDisplay: (disp) => set((state) => ({ display: { ...state.display, ...disp } })),
       updateSecurity: (sec) => set((state) => ({ security: { ...state.security, ...sec } })),
+      updateScaleConfig: (cfg) => set((state) => ({ scaleConfig: { ...state.scaleConfig, ...cfg } })),
       incrementSales: () => set((state) => ({
         subscription: {
           ...state.subscription,

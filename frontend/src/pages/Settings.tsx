@@ -9,10 +9,16 @@ import {
   Store, 
   ChevronRight,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  Scale,
+  Cpu,
+  Barcode,
+  Sliders,
+  Play
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { ScaleService } from '../services/scaleService';
 
 const Settings: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string | null>('business');
@@ -43,12 +49,37 @@ const Settings: React.FC = () => {
     employeeBlockInventory: true,
     employeeBlockCash: true
   };
+  const scaleConfig = store.scaleConfig || {
+    enabled: false,
+    mode: 'BOTH',
+    directConfig: { connectionType: 'WEB_SERIAL', baudRate: 9600, protocol: 'SYSTEL_KRETZ', autoConnect: false },
+    barcodeConfig: { prefix: '20', valueType: 'WEIGHT_GRAMS', codeLength: 5, valueLength: 5 }
+  };
   const { 
     updateBusinessInfo, 
     updateNotifications, 
     updateDisplay,
-    updateSecurity
+    updateSecurity,
+    updateScaleConfig
   } = store;
+
+  const [testDirectStatus, setTestDirectStatus] = useState<{ connected: boolean; weight: number }>({ connected: false, weight: 0 });
+  const [testDirectMessage, setTestDirectMessage] = useState('');
+  const [testBarcode, setTestBarcode] = useState('2000105012504');
+  const [testBarcodeResult, setTestBarcodeResult] = useState<any>(null);
+
+  const handleTestDirectScale = async () => {
+    if (scaleConfig.directConfig.connectionType === 'SIMULATED') {
+      const weight = ScaleService.simulateReadWeight();
+      setTestDirectStatus({ connected: true, weight });
+      setTestDirectMessage(`Simulación activa: peso obtenido ${weight.toFixed(3)} Kg`);
+    } else {
+      setTestDirectMessage('Solicitando puerto serie...');
+      const res = await ScaleService.connectDirectScale(scaleConfig.directConfig.baudRate);
+      setTestDirectMessage(res.message);
+      setTestDirectStatus({ connected: res.success, weight: ScaleService.getLastWeight() });
+    }
+  };
 
   const handleSave = () => {
     setShowSaved(true);
@@ -96,6 +127,12 @@ const Settings: React.FC = () => {
             title="Seguridad" 
             active={activeSection === 'security'} 
             onClick={() => setActiveSection('security')}
+          />
+          <NavButton 
+            icon={<Scale size={20} />} 
+            title="Balanzas y Periféricos" 
+            active={activeSection === 'peripherals'} 
+            onClick={() => setActiveSection('peripherals')}
           />
           <NavButton 
             icon={<CreditCard size={20} />} 
@@ -259,6 +296,233 @@ const Settings: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeSection === 'peripherals' && (
+                  <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Scale className="text-blue-600" /> Balanzas & Periféricos Híbridos
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Configura la conexión directa por puerto serie/USB y el escaneo de códigos de barras generados por balanzas.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <Toggle 
+                        label="Activar Integración con Balanzas" 
+                        description="Habilita la lectura automática de peso y la interpretación de códigos de barras EAN-13 de balanzas."
+                        checked={scaleConfig.enabled}
+                        onChange={(val: boolean) => updateScaleConfig({ enabled: val })}
+                      />
+
+                      {scaleConfig.enabled && (
+                        <>
+                          <div className="space-y-3">
+                            <label className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                              Modo de Funcionamiento de la Balanza
+                            </label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => updateScaleConfig({ mode: 'DIRECT' })}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                  scaleConfig.mode === 'DIRECT'
+                                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-600/10 text-blue-600 dark:text-blue-400 shadow-md'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-2 font-bold text-slate-900 dark:text-white">
+                                  <Cpu size={18} className="text-blue-600" /> Balanza Directa
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Conectada por puerto Serie/USB al equipo. Lee el peso en tiempo real al cobrar.
+                                </p>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => updateScaleConfig({ mode: 'BARCODE' })}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                  scaleConfig.mode === 'BARCODE'
+                                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-600/10 text-blue-600 dark:text-blue-400 shadow-md'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-2 font-bold text-slate-900 dark:text-white">
+                                  <Barcode size={18} className="text-blue-600" /> Balanza con Etiquetadora
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Imprime etiquetas EAN-13. El POS interpreta el producto y el peso/precio al escanear.
+                                </p>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => updateScaleConfig({ mode: 'BOTH' })}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                  scaleConfig.mode === 'BOTH'
+                                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-600/10 text-blue-600 dark:text-blue-400 shadow-md'
+                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-2 font-bold text-slate-900 dark:text-white">
+                                  <Sliders size={18} className="text-blue-600" /> Híbrido (Ambas)
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Soporta balanza en vivo por cable y etiquetas impresas por balanza simultáneamente.
+                                </p>
+                              </button>
+                            </div>
+                          </div>
+
+                          {(scaleConfig.mode === 'DIRECT' || scaleConfig.mode === 'BOTH') && (
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                              <h4 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                                <Cpu size={18} className="text-blue-600" /> Configuración de Conexión Directa
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Tipo de Conexión</label>
+                                  <select
+                                    value={scaleConfig.directConfig.connectionType}
+                                    onChange={(e) => updateScaleConfig({
+                                      directConfig: { ...scaleConfig.directConfig, connectionType: e.target.value as any }
+                                    })}
+                                    className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                                  >
+                                    <option value="WEB_SERIAL">Web Serial API (RS232 / USB Serie - Systel/Kretz)</option>
+                                    <option value="SIMULATED">Simulación para Pruebas (Modo Demo)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Baud Rate (Velocidad)</label>
+                                  <select
+                                    value={scaleConfig.directConfig.baudRate}
+                                    onChange={(e) => updateScaleConfig({
+                                      directConfig: { ...scaleConfig.directConfig, baudRate: Number(e.target.value) }
+                                    })}
+                                    className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                                  >
+                                    <option value={9600}>9600 Baud (Predeterminado Systel/Kretz/Toledo)</option>
+                                    <option value={4800}>4800 Baud</option>
+                                    <option value={2400}>2400 Baud</option>
+                                    <option value={19200}>19200 Baud</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                  <span className={`w-3 h-3 rounded-full ${testDirectStatus.connected ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`}></span>
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Estado: {testDirectStatus.connected ? 'CONECTADA Y LEYENDO' : 'DESCONECTADA'}
+                                  </span>
+                                  {testDirectStatus.weight > 0 && (
+                                    <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-xl text-xs font-black">
+                                      ⚖️ {testDirectStatus.weight.toFixed(3)} Kg
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleTestDirectScale}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                                  >
+                                    <Play size={14} /> Probar Conexión Directa
+                                  </button>
+                                </div>
+                              </div>
+                              {testDirectMessage && (
+                                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">{testDirectMessage}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {(scaleConfig.mode === 'BARCODE' || scaleConfig.mode === 'BOTH') && (
+                            <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                              <h4 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                                <Barcode size={18} className="text-blue-600" /> Configuración de Código de Barras (EAN-13)
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Prefijo de Etiqueta</label>
+                                  <input
+                                    type="text"
+                                    maxLength={2}
+                                    value={scaleConfig.barcodeConfig.prefix}
+                                    onChange={(e) => updateScaleConfig({
+                                      barcodeConfig: { ...scaleConfig.barcodeConfig, prefix: e.target.value }
+                                    })}
+                                    placeholder="20"
+                                    className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                                  />
+                                  <p className="text-[10px] text-slate-400 mt-1">Normalmente es '20' o '21' en balanzas de supermercado.</p>
+                                </div>
+
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Dato Codificado en la Etiqueta</label>
+                                  <select
+                                    value={scaleConfig.barcodeConfig.valueType}
+                                    onChange={(e) => updateScaleConfig({
+                                      barcodeConfig: { ...scaleConfig.barcodeConfig, valueType: e.target.value as any }
+                                    })}
+                                    className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                                  >
+                                    <option value="WEIGHT_GRAMS">Peso en Gramos (ej: 01250 = 1,250 Kg)</option>
+                                    <option value="PRICE_CENTS">Precio Total en Centavos (ej: 03750 = $3.750)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
+                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Probar Interpretación de Código EAN-13</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    maxLength={13}
+                                    value={testBarcode}
+                                    onChange={(e) => setTestBarcode(e.target.value)}
+                                    placeholder="Ej: 2000105012504"
+                                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-2 px-3 text-xs font-mono font-bold"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const res = ScaleService.parseBarcode(testBarcode, scaleConfig.barcodeConfig);
+                                      setTestBarcodeResult(res);
+                                    }}
+                                    className="bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold px-4 py-2 rounded-xl"
+                                  >
+                                    Probar Escaneo
+                                  </button>
+                                </div>
+
+                                {testBarcodeResult && (
+                                  <div className={`p-3 rounded-xl text-xs font-bold ${testBarcodeResult.isScaleBarcode ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'}`}>
+                                    {testBarcodeResult.isScaleBarcode ? (
+                                      <div>
+                                        <p>✅ Código de Balanza Válido</p>
+                                        <p className="font-mono text-[11px] mt-1">
+                                          Código Producto (PLU): <strong>{testBarcodeResult.productCode}</strong> | {testBarcodeResult.valueType === 'WEIGHT_GRAMS' ? `Peso: ${testBarcodeResult.weightKg?.toFixed(3)} Kg` : `Precio Total: $${testBarcodeResult.pricePaid?.toLocaleString()}`}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <p>❌ El código ingresado no cumple con el prefijo o formato de balanza configurado ({scaleConfig.barcodeConfig.prefix}).</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

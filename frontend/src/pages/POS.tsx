@@ -16,7 +16,8 @@ import {
   SendHorizontal,
   AlertCircle,
   QrCode,
-  Loader2
+  Loader2,
+  Scale
 } from 'lucide-react';
 import { useInventoryStore } from '../store/useInventoryStore';
 import type { Product, ProductCategory } from '../store/useInventoryStore';
@@ -26,6 +27,7 @@ import { useCustomerStore } from '../store/useCustomerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../utils/supabaseClient';
 import AudioHelper from '../utils/audioHelper';
+import { ScaleService } from '../services/scaleService';
 import axios from 'axios';
 
 interface CartItem extends Product {
@@ -43,13 +45,29 @@ const CATEGORY_EMOJIS: Record<ProductCategory, string> = {
 
 const POS: React.FC = () => {
   const { products } = useInventoryStore();
-  const { businessInfo } = useSettingsStore();
+  const { businessInfo, scaleConfig } = useSettingsStore();
   const { session, addTransaction } = useCashStore();
   const { customers } = useCustomerStore();
   const { user } = useAuthStore();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'Todos'>('Todos');
+  
+  // Scale States
+  const [weightProduct, setWeightProduct] = useState<Product | null>(null);
+  const [manualWeight, setManualWeight] = useState<string>('1.000');
+  const [liveScaleWeight, setLiveScaleWeight] = useState<number>(0);
+  const [isScaleConnected, setIsScaleConnected] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (scaleConfig?.enabled && (scaleConfig.mode === 'DIRECT' || scaleConfig.mode === 'BOTH')) {
+      const unsubscribe = ScaleService.subscribe((weight, connected) => {
+        setLiveScaleWeight(weight);
+        setIsScaleConnected(connected);
+      });
+      return () => unsubscribe();
+    }
+  }, [scaleConfig]);
   
   const activePlan = user?.subActive ? user?.plan : 'FREE';
   const isPro = activePlan === 'PRO';
@@ -82,20 +100,49 @@ const POS: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, customQty?: number) => {
     if (!session.isOpen) {
       alert('Debes abrir la caja primero');
       return;
     }
+
+    if (product.unit === 'KILO' && customQty === undefined) {
+      let qty = 1.0;
+      if (scaleConfig?.enabled && (scaleConfig.mode === 'DIRECT' || scaleConfig.mode === 'BOTH')) {
+        let w = liveScaleWeight > 0 ? liveScaleWeight : ScaleService.getLastWeight();
+        if (w <= 0 && scaleConfig.directConfig.connectionType === 'SIMULATED') {
+          w = ScaleService.simulateReadWeight();
+        }
+        if (w > 0) {
+          qty = w;
+          AudioHelper.playScanBeep();
+          setCart(prevCart => {
+            const existing = prevCart.find(item => item.id === product.id);
+            if (existing) {
+              return prevCart.map(item =>
+                item.id === product.id ? { ...item, quantity: parseFloat((item.quantity + qty).toFixed(3)) } : item
+              );
+            }
+            return [...prevCart, { ...product, quantity: parseFloat(qty.toFixed(3)) }];
+          });
+          return;
+        }
+      }
+      setWeightProduct(product);
+      setManualWeight('1.000');
+      return;
+    }
+
+    const qtyToAdd = customQty ?? 1;
     AudioHelper.playScanBeep();
     setCart(prevCart => {
       const existing = prevCart.find(item => item.id === product.id);
       if (existing) {
         return prevCart.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === product.id ? { ...item, quantity: parseFloat((item.quantity + qtyToAdd).toFixed(3)) } : item
         );
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+      return [...prevCart, { ...product, quantity: parseFloat(qtyToAdd.toFixed(3)) }];
     });
   };
 
@@ -583,21 +630,72 @@ const POS: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchTerm.trim() !== '') {
-                  // Buscar coincidencia exacta por código de barras
-                  const exactMatch = products.find(p => p.barcode === searchTerm.trim());
+                  const term = searchTerm.trim();
+
+                  // 1. Check scale barcode interpretation if scale integration is active
+                  if (scaleConfig?.enabled && (scaleConfig.mode === 'BARCODE' || scaleConfig.mode === 'BOTH')) {
+                    const scaleResult = ScaleService.parseBarcode(term, scaleConfig.barcodeConfig);
+                    if (scaleResult.isScaleBarcode && scaleResult.productCode) {
+                      const targetProd = products.find(p => 
+                        p.barcode === scaleResult.productCode || 
+                        p.barcode.endsWith(scaleResult.productCode!) ||
+                        p.barcode === (scaleConfig.barcodeConfig.prefix + scaleResult.productCode)
+                      );
+
+                      if (targetProd) {
+                        let qty = 1;
+                        if (scaleResult.valueType === 'PRICE_CENTS' && scaleResult.pricePaid && targetProd.price > 0) {
+                          qty = parseFloat((scaleResult.pricePaid / targetProd.price).toFixed(3));
+                        } else if (scaleResult.valueType === 'WEIGHT_GRAMS' && scaleResult.weightKg) {
+                          qty = scaleResult.weightKg;
+                        }
+                        addToCart(targetProd, qty);
+                        setSearchTerm('');
+                        return;
+                      } else {
+                        alert(`No se encontró ningún producto registrado con el código de balanza #${scaleResult.productCode}`);
+                        setSearchTerm('');
+                        return;
+                      }
+                    }
+                  }
+
+                  // 2. Fallback to normal product barcode matching
+                  const exactMatch = products.find(p => p.barcode === term);
                   if (exactMatch) {
                     addToCart(exactMatch);
                     setSearchTerm('');
                   } else if (filteredProducts.length === 1) {
-                    // Si no hay por código pero la búsqueda dejó solo 1 producto, lo agregamos
                     addToCart(filteredProducts[0]);
                     setSearchTerm('');
                   }
                 }
               }}
             />
-            <div className="absolute right-4 top-3.5 p-1 bg-blue-600 rounded-lg text-white">
-              <ScanBarcode size={20} />
+            <div className="absolute right-4 top-3.5 flex items-center gap-2">
+              {scaleConfig?.enabled && (
+                <div 
+                  onClick={async () => {
+                    if (scaleConfig.directConfig.connectionType === 'SIMULATED') {
+                      ScaleService.simulateReadWeight();
+                    } else {
+                      await ScaleService.connectDirectScale(scaleConfig.directConfig.baudRate);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                    isScaleConnected ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}
+                  title="Estado de la balanza. Haz clic para probar/conectar."
+                >
+                  <Scale size={14} className={isScaleConnected ? 'text-emerald-500' : 'text-slate-400'} />
+                  <span className="hidden sm:inline">
+                    {isScaleConnected ? `Balanza (${liveScaleWeight.toFixed(3)} Kg)` : 'Balanza Activa'}
+                  </span>
+                </div>
+              )}
+              <div className="p-1 bg-blue-600 rounded-lg text-white">
+                <ScanBarcode size={20} />
+              </div>
             </div>
           </div>
 
@@ -1043,6 +1141,110 @@ const POS: React.FC = () => {
                 <button onClick={resetPOS} className="text-blue-600 font-black hover:underline">NUEVA VENTA</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Weight Modal for Products sold by Weight */}
+      {weightProduct && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm print:hidden animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 p-6 space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 dark:bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center font-bold">
+                  <Scale size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">{weightProduct.name}</h3>
+                  <p className="text-xs text-slate-400 font-semibold">${weightProduct.price.toLocaleString()} / Kg</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setWeightProduct(null)} 
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Ingresar o Leer Peso (Kg):</label>
+                <div className="relative mt-2">
+                  <input
+                    type="number"
+                    step="0.005"
+                    min="0.001"
+                    autoFocus
+                    value={manualWeight}
+                    onChange={(e) => setManualWeight(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 px-6 font-black text-2xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <span className="absolute right-6 top-4 font-black text-slate-400 text-lg">Kg</span>
+                </div>
+              </div>
+
+              {scaleConfig?.enabled && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    let w = liveScaleWeight;
+                    if (w <= 0 && scaleConfig.directConfig.connectionType === 'SIMULATED') {
+                      w = ScaleService.simulateReadWeight();
+                    } else if (w <= 0) {
+                      const res = await ScaleService.connectDirectScale(scaleConfig.directConfig.baudRate);
+                      if (!res.success) alert(res.message);
+                      w = ScaleService.getLastWeight();
+                    }
+                    if (w > 0) {
+                      setManualWeight(w.toFixed(3));
+                    }
+                  }}
+                  className="w-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border border-slate-200 dark:border-slate-700 cursor-pointer"
+                >
+                  <Scale size={16} className="text-blue-600" /> Leer Peso de la Balanza {liveScaleWeight > 0 ? `(${liveScaleWeight.toFixed(3)} Kg)` : ''}
+                </button>
+              )}
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-600/10 rounded-2xl flex justify-between items-center text-blue-600 dark:text-blue-400 font-black">
+                <span className="text-sm">TOTAL A AGREGAR:</span>
+                <span className="text-2xl">${((parseFloat(manualWeight) || 0) * weightProduct.price).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setWeightProduct(null)}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 py-3.5 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const weightVal = parseFloat(manualWeight);
+                  if (isNaN(weightVal) || weightVal <= 0) {
+                    alert('Ingrese un peso válido');
+                    return;
+                  }
+                  AudioHelper.playScanBeep();
+                  setCart(prevCart => {
+                    const existing = prevCart.find(item => item.id === weightProduct.id);
+                    if (existing) {
+                      return prevCart.map(item =>
+                        item.id === weightProduct.id ? { ...item, quantity: parseFloat((item.quantity + weightVal).toFixed(3)) } : item
+                      );
+                    }
+                    return [...prevCart, { ...weightProduct, quantity: parseFloat(weightVal.toFixed(3)) }];
+                  });
+                  setWeightProduct(null);
+                }}
+                className="flex-1 bg-blue-600 text-white py-3.5 rounded-2xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}
