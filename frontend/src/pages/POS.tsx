@@ -507,7 +507,7 @@ const POS: React.FC = () => {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden bg-slate-50 dark:bg-slate-950 print:bg-white relative">
       {/* Print-only Ticket Wrapper */}
-      <div className={`hidden print:block print:absolute print:inset-0 print:z-[200] bg-white mx-auto text-black font-mono ${
+      <div className={`printable-ticket hidden print:block print:absolute print:inset-0 print:z-[200] bg-white mx-auto text-black font-mono ${
         ticketSize === '58mm' ? 'w-[58mm] p-2 text-[8.5pt]' : 'w-[80mm] p-4 text-[10pt]'
       }`}>
         <div className="text-center border-b border-black pb-3 mb-3">
