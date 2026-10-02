@@ -73,6 +73,7 @@ const POS: React.FC = () => {
   const [isWaitingForMP, setIsWaitingForMP] = useState(false);
   const [mpInitPoint, setMpInitPoint] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ticketSize, setTicketSize] = useState<'80mm' | '58mm'>('80mm');
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
 
   const filteredProducts = products.filter(p => {
@@ -493,38 +494,44 @@ const POS: React.FC = () => {
     setSaleId('');
     setSelectedCustomerId('');
     setMpInitPoint('');
+    setTicketSize('80mm');
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (size: '80mm' | '58mm' = '80mm') => {
+    setTicketSize(size);
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden bg-slate-50 dark:bg-slate-950 print:bg-white relative">
       {/* Print-only Ticket Wrapper */}
-      <div className="hidden print:block print:absolute print:inset-0 print:z-[200] bg-white p-4 w-[80mm] mx-auto text-black font-mono text-[10pt]">
-        <div className="text-center border-b border-black pb-4 mb-4">
-          <p className="font-bold text-lg uppercase">{businessInfo?.name || 'Comercio'}</p>
-          <p className="text-sm">{businessInfo?.address}</p>
-          <p className="text-sm">CUIT: {businessInfo?.taxId}</p>
-          <p className="text-sm">Tel: {businessInfo?.phone}</p>
-          <p className="text-sm">{businessInfo?.email}</p>
+      <div className={`hidden print:block print:absolute print:inset-0 print:z-[200] bg-white mx-auto text-black font-mono ${
+        ticketSize === '58mm' ? 'w-[58mm] p-2 text-[8.5pt]' : 'w-[80mm] p-4 text-[10pt]'
+      }`}>
+        <div className="text-center border-b border-black pb-3 mb-3">
+          <p className="font-bold text-base uppercase leading-tight">{businessInfo?.name || 'Comercio'}</p>
+          <p className="text-xs">{businessInfo?.address}</p>
+          <p className="text-xs">CUIT: {businessInfo?.taxId}</p>
+          <p className="text-xs">Tel: {businessInfo?.phone}</p>
+          <p className="text-xs">{businessInfo?.email}</p>
           {selectedCustomerId && (
-            <p className="text-sm mt-1 font-bold">Cliente: {customers.find(c => c.id === selectedCustomerId)?.name}</p>
+            <p className="text-xs mt-1 font-bold">Cliente: {customers.find(c => c.id === selectedCustomerId)?.name}</p>
           )}
-          <p className="mt-2 text-xs font-bold">Venta: {saleId}</p>
-          <p className="text-xs">{new Date().toLocaleString()}</p>
+          <p className="mt-2 text-[10px] font-bold">Venta: {saleId}</p>
+          <p className="text-[10px]">{new Date().toLocaleString()}</p>
         </div>
-        <div className="space-y-1 mb-4">
+        <div className="space-y-1 mb-3">
           {cart.map(item => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>{item.quantity}x {item.name.substring(0, 22)}</span>
-              <span>${(item.price * item.quantity).toLocaleString()}</span>
+            <div key={item.id} className="flex justify-between text-xs">
+              <span className="truncate pr-1">{item.quantity}x {item.name.substring(0, ticketSize === '58mm' ? 14 : 22)}</span>
+              <span className="whitespace-nowrap">${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
             </div>
           ))}
         </div>
-        <div className="border-t border-black pt-2 space-y-1">
-          <div className="flex justify-between font-bold">
+        <div className="border-t border-black pt-2 space-y-1 text-xs">
+          <div className="flex justify-between font-bold text-sm">
             <span>TOTAL</span>
             <span>${total.toLocaleString()}</span>
           </div>
@@ -539,7 +546,7 @@ const POS: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="text-center mt-6 pt-4 border-t border-black italic text-sm">
+        <div className="text-center mt-4 pt-3 border-t border-black italic text-xs">
           <p>¡Gracias por su compra!</p>
           <p>Conserve su ticket</p>
         </div>
@@ -1028,9 +1035,10 @@ const POS: React.FC = () => {
                   <div className="border-t border-dashed border-slate-300 pt-4 space-y-2"><div className="flex justify-between font-black text-slate-900 dark:text-white text-sm"><span>TOTAL</span><span>${total.toLocaleString()}</span></div><div className="flex justify-between"><span>PAGO ({paymentMethod})</span><span>${Number(amountPaid) || total}</span></div>{paymentMethod === 'EFECTIVO' && (<div className="flex justify-between text-emerald-600 font-bold"><span>VUELTO</span><span>${change.toLocaleString()}</span></div>)}</div>
                   <div className="text-center pt-4 opacity-50"><p>¡Gracias por su compra!</p><p>{new Date().toLocaleString()}</p></div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 w-full max-sm">
-                  <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-slate-900 text-white p-4 rounded-2xl font-bold hover:bg-slate-800 transition-all"><Printer size={18} /> Ticket 80mm</button>
-                  <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-900 p-4 rounded-2xl font-bold hover:bg-slate-50 transition-all"><Download size={18} /> Guardar PDF</button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+                  <button onClick={() => handlePrint('80mm')} className="flex items-center justify-center gap-2 bg-slate-900 text-white p-3.5 rounded-2xl font-bold hover:bg-slate-800 transition-all text-sm shadow-sm cursor-pointer"><Printer size={18} /> Ticket 80mm</button>
+                  <button onClick={() => handlePrint('58mm')} className="flex items-center justify-center gap-2 bg-slate-800 text-white p-3.5 rounded-2xl font-bold hover:bg-slate-700 transition-all text-sm shadow-sm cursor-pointer"><Printer size={18} /> Ticket 58mm</button>
+                  <button onClick={() => handlePrint('80mm')} className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-900 p-3.5 rounded-2xl font-bold hover:bg-slate-50 transition-all text-sm shadow-sm cursor-pointer"><Download size={18} /> Guardar PDF</button>
                 </div>
                 <button onClick={resetPOS} className="text-blue-600 font-black hover:underline">NUEVA VENTA</button>
               </div>
