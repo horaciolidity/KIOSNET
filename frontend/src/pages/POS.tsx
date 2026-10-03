@@ -545,10 +545,107 @@ const POS: React.FC = () => {
   };
 
   const handlePrint = (size: '80mm' | '58mm' = '80mm') => {
-    setTicketSize(size);
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    const width = size === '58mm' ? '58mm' : '80mm';
+    const fontSize = size === '58mm' ? '8.5pt' : '10pt';
+    const padding = size === '58mm' ? '2mm' : '4mm';
+    const maxChars = size === '58mm' ? 14 : 22;
+
+    const customer = selectedCustomerId
+      ? customers.find(c => c.id === selectedCustomerId)?.name
+      : null;
+
+    const itemsHtml = cart
+      .map(item => `
+        <div style="display:flex;justify-content:space-between;font-size:${fontSize};margin-bottom:2px;">
+          <span style="overflow:hidden;white-space:nowrap;padding-right:4px;">${item.quantity}x ${item.name.substring(0, maxChars)}</span>
+          <span style="white-space:nowrap;">$${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
+        </div>`)
+      .join('');
+
+    const changeHtml = paymentMethod === 'EFECTIVO'
+      ? `<div style="display:flex;justify-content:space-between;font-weight:bold;font-size:${fontSize};">
+           <span>VUELTO</span><span>$${change.toLocaleString()}</span>
+         </div>`
+      : '';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page {
+    size: ${width} auto;
+    margin: 0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: ${fontSize};
+    width: ${width};
+    padding: ${padding};
+    color: #000;
+    background: #fff;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .border-b { border-bottom: 1px solid #000; padding-bottom: 6px; margin-bottom: 6px; }
+  .border-t { border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
+  .row { display: flex; justify-content: space-between; font-size: ${fontSize}; margin-bottom: 2px; }
+  .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: ${size === '58mm' ? '10pt' : '12pt'}; }
+  .small { font-size: ${size === '58mm' ? '7pt' : '8.5pt'}; }
+  .italic { font-style: italic; }
+  .mt { margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="center border-b">
+    <p class="bold" style="font-size:${size === '58mm' ? '10pt' : '12pt'};text-transform:uppercase;">${businessInfo?.name || 'Comercio'}</p>
+    ${businessInfo?.address ? `<p class="small">${businessInfo.address}</p>` : ''}
+    ${businessInfo?.taxId ? `<p class="small">CUIT: ${businessInfo.taxId}</p>` : ''}
+    ${businessInfo?.phone ? `<p class="small">Tel: ${businessInfo.phone}</p>` : ''}
+    ${businessInfo?.email ? `<p class="small">${businessInfo.email}</p>` : ''}
+    ${customer ? `<p class="small bold" style="margin-top:4px;">Cliente: ${customer}</p>` : ''}
+    <p class="small bold" style="margin-top:4px;">Venta: ${saleId}</p>
+    <p class="small">${new Date().toLocaleString()}</p>
+  </div>
+
+  <div style="margin-bottom:6px;">${itemsHtml}</div>
+
+  <div class="border-t">
+    <div class="total-row"><span>TOTAL</span><span>$${total.toLocaleString()}</span></div>
+    <div class="row"><span>PAGO (${paymentMethod})</span><span>$${Number(amountPaid) || total}</span></div>
+    ${changeHtml}
+  </div>
+
+  <div class="center border-t mt italic">
+    <p>¡Gracias por su compra!</p>
+    <p>Conserve su ticket</p>
+  </div>
+</body>
+</html>`;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = width;
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    iframe.onload = () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    };
   };
 
   return (
