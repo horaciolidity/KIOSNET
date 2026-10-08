@@ -547,8 +547,9 @@ const POS: React.FC = () => {
   const handlePrint = (size: '80mm' | '58mm' = '80mm') => {
     const width = size === '58mm' ? '58mm' : '80mm';
     const fontSize = size === '58mm' ? '8.5pt' : '10pt';
-    const padding = size === '58mm' ? '2mm' : '4mm';
-    const maxChars = size === '58mm' ? 14 : 22;
+    // Margen derecho ampliado (6mm en 58mm y 8mm en 80mm) para que el cabezal térmico no corte números laterales
+    const padding = size === '58mm' ? '3mm 6mm 3mm 5mm' : '4mm 8mm 4mm 6mm';
+    const maxChars = size === '58mm' ? 13 : 20;
 
     const customer = selectedCustomerId
       ? customers.find(c => c.id === selectedCustomerId)?.name
@@ -556,14 +557,14 @@ const POS: React.FC = () => {
 
     const itemsHtml = cart
       .map(item => `
-        <div style="display:flex;justify-content:space-between;font-size:${fontSize};margin-bottom:2px;">
-          <span style="overflow:hidden;white-space:nowrap;padding-right:4px;">${item.quantity}x ${item.name.substring(0, maxChars)}</span>
-          <span style="white-space:nowrap;">$${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
+        <div style="display:flex;justify-content:space-between;font-size:${fontSize};margin-bottom:3px;gap:4px;">
+          <span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:2px;">${item.quantity}x ${item.name.substring(0, maxChars)}</span>
+          <span style="white-space:nowrap;font-weight:bold;text-align:right;padding-right:2px;">$${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
         </div>`)
       .join('');
 
     const changeHtml = paymentMethod === 'EFECTIVO'
-      ? `<div style="display:flex;justify-content:space-between;font-weight:bold;font-size:${fontSize};">
+      ? `<div style="display:flex;justify-content:space-between;font-weight:bold;font-size:${fontSize};padding-right:2px;">
            <span>VUELTO</span><span>$${change.toLocaleString()}</span>
          </div>`
       : '';
@@ -585,13 +586,14 @@ const POS: React.FC = () => {
     padding: ${padding};
     color: #000;
     background: #fff;
+    word-break: break-word;
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .border-b { border-bottom: 1px solid #000; padding-bottom: 6px; margin-bottom: 6px; }
-  .border-t { border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
-  .row { display: flex; justify-content: space-between; font-size: ${fontSize}; margin-bottom: 2px; }
-  .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: ${size === '58mm' ? '10pt' : '12pt'}; }
+  .border-b { border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+  .border-t { border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; }
+  .row { display: flex; justify-content: space-between; font-size: ${fontSize}; margin-bottom: 2px; padding-right: 2px; }
+  .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: ${size === '58mm' ? '9.5pt' : '11.5pt'}; padding-right: 2px; }
   .small { font-size: ${size === '58mm' ? '7pt' : '8.5pt'}; }
   .italic { font-style: italic; }
   .mt { margin-top: 8px; }
@@ -599,7 +601,7 @@ const POS: React.FC = () => {
 </head>
 <body>
   <div class="center border-b">
-    <p class="bold" style="font-size:${size === '58mm' ? '10pt' : '12pt'};text-transform:uppercase;">${businessInfo?.name || 'Comercio'}</p>
+    <p class="bold" style="font-size:${size === '58mm' ? '9.5pt' : '11.5pt'};text-transform:uppercase;">${businessInfo?.name || 'Comercio'}</p>
     ${businessInfo?.address ? `<p class="small">${businessInfo.address}</p>` : ''}
     ${businessInfo?.taxId ? `<p class="small">CUIT: ${businessInfo.taxId}</p>` : ''}
     ${businessInfo?.phone ? `<p class="small">Tel: ${businessInfo.phone}</p>` : ''}
@@ -652,10 +654,10 @@ const POS: React.FC = () => {
     <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden bg-slate-50 dark:bg-slate-950 print:bg-white relative">
       {/* Print-only Ticket Wrapper */}
       <div className={`printable-ticket hidden print:block print:absolute print:inset-0 print:z-[200] bg-white mx-auto text-black font-mono ${
-        ticketSize === '58mm' ? 'w-[58mm] p-2 text-[8.5pt]' : 'w-[80mm] p-4 text-[10pt]'
+        ticketSize === '58mm' ? 'w-[58mm] pl-3 pr-4 py-2 text-[8pt]' : 'w-[80mm] pl-4 pr-6 py-4 text-[9.5pt]'
       }`}>
         <div className="text-center border-b border-black pb-3 mb-3">
-          <p className="font-bold text-base uppercase leading-tight">{businessInfo?.name || 'Comercio'}</p>
+          <p className="font-bold text-sm uppercase leading-tight">{businessInfo?.name || 'Comercio'}</p>
           <p className="text-xs">{businessInfo?.address}</p>
           <p className="text-xs">CUIT: {businessInfo?.taxId}</p>
           <p className="text-xs">Tel: {businessInfo?.phone}</p>
@@ -668,23 +670,23 @@ const POS: React.FC = () => {
         </div>
         <div className="space-y-1 mb-3">
           {cart.map(item => (
-            <div key={item.id} className="flex justify-between text-xs">
-              <span className="truncate pr-1">{item.quantity}x {item.name.substring(0, ticketSize === '58mm' ? 14 : 22)}</span>
-              <span className="whitespace-nowrap">${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
+            <div key={item.id} className="flex justify-between text-xs gap-1">
+              <span className="truncate pr-1">{item.quantity}x {item.name.substring(0, ticketSize === '58mm' ? 13 : 20)}</span>
+              <span className="whitespace-nowrap font-bold pr-1">${(getItemPrice(item) * item.quantity).toLocaleString()}</span>
             </div>
           ))}
         </div>
         <div className="border-t border-black pt-2 space-y-1 text-xs">
-          <div className="flex justify-between font-bold text-sm">
+          <div className="flex justify-between font-bold text-sm pr-1">
             <span>TOTAL</span>
             <span>${total.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between text-xs">
+          <div className="flex justify-between text-xs pr-1">
             <span>PAGO ({paymentMethod})</span>
             <span>${Number(amountPaid) || total}</span>
           </div>
           {paymentMethod === 'EFECTIVO' && (
-            <div className="flex justify-between font-bold">
+            <div className="flex justify-between font-bold pr-1">
               <span>VUELTO</span>
               <span>${change.toLocaleString()}</span>
             </div>
