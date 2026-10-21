@@ -71,14 +71,12 @@ const SuperAdmin: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch tenants along with users and sales
+      // Fetch tenants along with users
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('Tenant')
         .select(`
           id, name, email, phone, address, plan, subActive, subExpiresAt, createdAt, paymentNotification,
-          users:User(id, email, name, role, active, createdAt),
-          sales:Sale(id),
-          products:Product(id)
+          users:User(id, email, name, role, active, createdAt)
         `)
         .order('createdAt', { ascending: false });
 
@@ -108,21 +106,37 @@ const SuperAdmin: React.FC = () => {
         if (cfg.key === 'transfer_alias') transferAlias = cfg.value || '';
       });
 
-      const mappedTenants: Tenant[] = (tenantsData || []).map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        email: t.email,
-        phone: t.phone,
-        address: t.address,
-        plan: t.plan,
-        subActive: t.subActive,
-        subExpiresAt: t.subExpiresAt,
-        createdAt: t.createdAt,
-        salesCount: t.sales?.length || 0,
-        productCount: t.products?.length || 0,
-        users: t.users || [],
-        paymentNotification: t.paymentNotification
-      }));
+      // Obtain exact counts for sales and products per tenant without downloading records
+      const mappedTenants: Tenant[] = await Promise.all(
+        (tenantsData || []).map(async (t: any) => {
+          const [{ count: salesCount }, { count: productCount }] = await Promise.all([
+            supabase
+              .from('Sale')
+              .select('*', { count: 'exact', head: true })
+              .eq('tenantId', t.id),
+            supabase
+              .from('Product')
+              .select('*', { count: 'exact', head: true })
+              .eq('tenantId', t.id)
+          ]);
+
+          return {
+            id: t.id,
+            name: t.name,
+            email: t.email,
+            phone: t.phone,
+            address: t.address,
+            plan: t.plan,
+            subActive: t.subActive,
+            subExpiresAt: t.subExpiresAt,
+            createdAt: t.createdAt,
+            salesCount: salesCount || 0,
+            productCount: productCount || 0,
+            users: t.users || [],
+            paymentNotification: t.paymentNotification
+          };
+        })
+      );
 
       setTenants(mappedTenants);
       setPrices({
