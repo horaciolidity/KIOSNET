@@ -526,56 +526,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
-          {/* Real-time Subscription Indicator */}
-          {isSidebarOpen && user && (
-            <div className="mb-2 bg-blue-50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/10 p-2.5 rounded-xl flex flex-col space-y-1 text-xs animate-in fade-in duration-300">
-              <div className="flex justify-between items-center">
-                <span className="font-black text-[9px] uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                  Plan: {user.subActive ? (user.plan === 'PRO' ? 'PRO' : 'ESTÁNDAR') : 'GRATUITO'}
-                </span>
-                {user.subActive ? (
-                  <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded-md uppercase">Activo</span>
-                ) : (
-                  <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded-md uppercase">Prueba</span>
-                )}
-              </div>
-              
-              {!user.subActive ? (
-                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-tight">
-                  {Math.max(0, 50 - (user.salesCount ?? 0))} ventas de prueba restantes
-                </p>
-              ) : (
-                <div className="space-y-0.5">
-                  {user.subExpiresAt && (
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                      Vence: {(() => {
-                        const d = new Date(user.subExpiresAt);
-                        return isNaN(d.getTime()) ? 'Mensual' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                      })()}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 mt-1">
-                {!user.subActive && !isEmployee && (
-                  <button 
-                    onClick={() => navigate('/billing')}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black py-1.5 rounded-lg transition-all text-center uppercase"
-                  >
-                    Activar
-                  </button>
-                )}
-                <a
-                  href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20o%20duda%20con%20el%20sistema%20KIOSNET"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 text-center bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black py-1.5 rounded-lg border border-emerald-500/20 transition-all uppercase tracking-wider"
-                >
-                  Soporte
-                </a>
-              </div>
-            </div>
+          {/* WhatsApp Support Button */}
+          {isSidebarOpen && (
+            <a
+              href="https://wa.me/5492617048835?text=Hola!%20Tengo%20un%20inconveniente%20o%20duda%20con%20el%20sistema%20KIOSNET"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full mb-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-black py-2 px-3 rounded-xl border border-emerald-500/20 transition-all uppercase tracking-wider text-center"
+            >
+              <span>💬 Soporte WhatsApp</span>
+            </a>
           )}
 
           <button 
@@ -620,15 +580,77 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:px-8 px-4 z-40 print:hidden">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between md:px-8 px-4 z-40 print:hidden relative gap-2 sm:gap-4">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-all"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-all shrink-0"
           >
             <Menu size={20} />
           </button>
 
-          <div className="flex items-center gap-6">
+          {/* Centralized Subscription Status Banner */}
+          {user && (
+            <div className="flex-1 flex items-center justify-center max-w-xl mx-auto px-2">
+              {!user.subActive ? (
+                <div className="flex items-center gap-1.5 sm:gap-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 dark:border-amber-500/30 px-3 sm:px-4 py-1.5 rounded-full text-xs shadow-xs animate-in fade-in duration-300">
+                  <span className="flex items-center gap-1 font-black text-[10px] sm:text-xs uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">
+                    <Crown size={14} className="text-amber-500 shrink-0" />
+                    <span>GRATUITO</span>
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-amber-400 hidden sm:inline-block shrink-0" />
+                  <span className="font-bold text-[11px] sm:text-xs text-slate-700 dark:text-slate-200 truncate">
+                    <strong className="text-amber-600 dark:text-amber-400 font-black">{Math.max(0, 50 - (user.salesCount ?? 0))}</strong>
+                    <span className="hidden sm:inline"> ventas gratis restantes</span>
+                    <span className="sm:hidden"> vtas rest.</span>
+                  </span>
+                  {!isEmployee && (
+                    <button
+                      onClick={() => navigate('/billing')}
+                      className="ml-1 sm:ml-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-wider px-2.5 sm:px-3 py-1 rounded-full shadow-sm hover:shadow transition-all active:scale-95 shrink-0"
+                    >
+                      Activar
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 sm:gap-3 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 dark:border-emerald-500/30 px-3 sm:px-4 py-1.5 rounded-full text-xs shadow-xs animate-in fade-in duration-300">
+                  <span className="flex items-center gap-1 font-black text-[10px] sm:text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-400 shrink-0">
+                    <Crown size={14} className="text-emerald-500 shrink-0" />
+                    <span>PLAN {user.plan === 'PRO' ? 'PRO' : 'ESTÁNDAR'}</span>
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-emerald-400 hidden sm:inline-block shrink-0" />
+                  <span className="font-bold text-[11px] sm:text-xs text-slate-700 dark:text-slate-200 truncate">
+                    {(() => {
+                      if (!user.subExpiresAt) return 'Activo';
+                      const exp = new Date(user.subExpiresAt);
+                      if (isNaN(exp.getTime())) return 'Activo';
+                      const days = Math.max(0, Math.ceil((exp.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          <strong className={days <= 5 ? 'text-amber-500 font-black' : 'text-emerald-600 dark:text-emerald-400 font-black'}>
+                            {days} {days === 1 ? 'día restante' : 'días restantes'}
+                          </strong>
+                          <span className="text-[10px] text-slate-400 hidden md:inline">
+                            (Vence: {exp.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })})
+                          </span>
+                        </span>
+                      );
+                    })()}
+                  </span>
+                  {!isEmployee && (
+                    <button
+                      onClick={() => navigate('/billing')}
+                      className="ml-1 sm:ml-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-wider px-2.5 sm:px-3 py-1 rounded-full shadow-sm hover:shadow transition-all active:scale-95 shrink-0"
+                    >
+                      {user.subExpiresAt && Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 5 ? 'Renovar' : 'Ver Plan'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-6 shrink-0">
             <div className="relative">
               <button 
                 onClick={() => {
