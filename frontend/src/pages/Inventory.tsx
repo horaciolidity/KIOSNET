@@ -10,7 +10,8 @@ import {
   X, 
   Save, 
   AlertCircle,
-  ScanBarcode
+  ScanBarcode,
+  Loader2
 } from 'lucide-react';
 import { useInventoryStore } from '../store/useInventoryStore';
 import type { Product, ProductCategory, ProductUnit } from '../store/useInventoryStore';
@@ -23,10 +24,11 @@ const UNITS: ProductUnit[] = ['UNIDAD', 'KILO', 'LITRO'];
 const Inventory: React.FC = () => {
   const { user } = useAuthStore();
   const { security } = useSettingsStore();
-  const { products, addProduct, updateProduct, deleteProduct } = useInventoryStore();
+  const { products, addProduct, updateProduct, deleteProduct, fetchProducts } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const isEmployee = user?.role === 'EMPLOYEE' && (security?.employeeBlockInventory ?? true);
 
@@ -110,9 +112,9 @@ const Inventory: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Nombre,Código,Categoría,Unidad,Costo,Precio,Stock,Mínimo\n'];
+    const headers = 'Nombre,Código,Categoría,Unidad,Costo,Precio,Stock,Mínimo,Precio Mayorista,Mínimo Mayorista\n';
     const rows = products.map(p => 
-      `${p.name},${p.barcode},${p.category},${p.unit},${p.costPrice},${p.price},${p.stock},${p.minStock}`
+      `"${(p.name || '').replace(/"/g, '""')}",${p.barcode || ''},${p.category || ''},${p.unit || ''},${p.costPrice || 0},${p.price || 0},${p.stock || 0},${p.minStock || 0},${p.wholesalePrice != null ? p.wholesalePrice : ''},${p.wholesaleMinQty != null ? p.wholesaleMinQty : ''}`
     ).join('\n');
     
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -124,7 +126,7 @@ const Inventory: React.FC = () => {
 
   const exportToTXT = () => {
     const content = products.map(p => 
-      `PRODUCTO: ${p.name} | CÓDIGO: ${p.barcode} | STOCK: ${p.stock} | PRECIO: $${p.price}`
+      `PRODUCTO: ${p.name} | CÓDIGO: ${p.barcode || 'S/C'} | STOCK: ${p.stock} | PRECIO: $${p.price}${p.wholesalePrice != null ? ` | P. MAYORISTA: $${p.wholesalePrice} (min. ${p.wholesaleMinQty || 1} u.)` : ''}`
     ).join('\n');
     
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
@@ -134,47 +136,250 @@ const Inventory: React.FC = () => {
     link.click();
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split('\n');
-      
-      // Skip header
-      for (let i = 1; i < lines.length; i++) {
+    setIsImporting(true);
+
+    try {
+      const text = await file.text();
+      const rawLines = text.split(/\r\n|\n|\r/);
+      const lines = rawLines.filter(l => l.trim().length > 0);
+
+      if (lines.length === 0) {
+        alert('El archivo está vacío');
+        return;
+      }
+
+      // 1. Detectar delimitador (, ; \t)
+      const firstLine = lines[0];
+      const countSemicolons = (firstLine.match(/;/g) || []).length;
+      const countCommas = (firstLine.match(/,/g) || []).length;
+      const countTabs = (firstLine.match(/\t/g) || []).length;
+      let delimiter = ',';
+      if (countSemicolons > countCommas && countSemicolons > countTabs) delimiter = ';';
+      else if (countTabs > countCommas && countTabs > countSemicolons) delimiter = '\t';
+
+      // Parser de línea CSV respetando comillas
+      const parseCSVLine = (line: string, delim: string): string[] => {
+        const result: string[] = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (char === delim && !inQuotes) {
+            result.push(cur.trim());
+            cur = '';
+          } else {
+            cur += char;
+          }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const normalizeStr = (str: string) => 
+        str.toLowerCase()
+           .normalize('NFD')
+           .replace(/[\u0300-\u036f]/g, '')
+           .replace(/[^a-z0-9]/g, '');
+
+      const parseNumber = (val: any): number | null => {
+        if (val === undefined || val === null) return null;
+        const clean = String(val).replace(/[$€\s]/g, '').trim();
+        if (!clean) return null;
+        if (clean.includes('.') && clean.includes(',')) {
+          if (clean.indexOf('.') < clean.indexOf(',')) {
+            return parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+          } else {
+            return parseFloat(clean.replace(/,/g, ''));
+          }
+        }
+        if (clean.includes(',')) {
+          return parseFloat(clean.replace(',', '.'));
+        }
+        const num = parseFloat(clean);
+        return isNaN(num) ? null : num;
+      };
+
+      // Sinónimos de columnas para coincidencia inteligente
+      const FIELD_ALIASES: Record<string, string[]> = {
+        name: ['nombre', 'name', 'producto', 'descripcion', 'articulo', 'item', 'detalle', 'descripciondelproducto'],
+        barcode: ['codigo', 'cod', 'barcode', 'barra', 'barras', 'codigobarra', 'codigodebarra', 'sku', 'ref', 'referencia'],
+        category: ['categoria', 'category', 'rubro', 'seccion', 'grupo', 'cat'],
+        unit: ['unidad', 'unit', 'medida', 'uom', 'unidaddemedida'],
+        costPrice: ['costo', 'cost', 'costprice', 'preciocosto', 'pcosto', 'compra', 'preciocompra'],
+        price: ['precio', 'price', 'precioventa', 'pventa', 'venta', 'minorista', 'preciominorista', 'publico', 'pvp', 'preciounitario'],
+        stock: ['stock', 'cantidad', 'cant', 'existencia', 'qty', 'inventario'],
+        minStock: ['minimo', 'stockmin', 'stockminimo', 'min', 'minstock', 'alertastock', 'cantminima'],
+        wholesalePrice: ['mayorista', 'pmayorista', 'preciomayorista', 'pmayor', 'preciomayor', 'mayoreo', 'preciomayoreo', 'wholesaleprice', 'wholesale'],
+        wholesaleMinQty: ['cantmayorista', 'cantminmayorista', 'cantidadmayorista', 'minmayorista', 'minimomayorista', 'unidadesmayorista', 'wholesaleminqty', 'cantmayoreo', 'minmayoreo', 'cantidadminima', 'cantmin'],
+      };
+
+      const firstRowCells = parseCSVLine(firstLine, delimiter);
+      const headerIndices: Record<string, number> = {};
+      let hasRecognizedHeader = false;
+
+      firstRowCells.forEach((cell, idx) => {
+        const norm = normalizeStr(cell);
+        if (!norm) return;
+        for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+          if (headerIndices[field] === undefined && aliases.some(alias => norm === alias || norm.includes(alias))) {
+            headerIndices[field] = idx;
+            hasRecognizedHeader = true;
+          }
+        }
+      });
+
+      const startIndex = hasRecognizedHeader ? 1 : 0;
+      let currentProducts = [...useInventoryStore.getState().products];
+      let updatedCount = 0;
+      let createdCount = 0;
+
+      for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
 
-        const [name, barcode, category, unit, costPrice, price, stock, minStock] = line.split(',');
+        const cells = parseCSVLine(line, delimiter);
 
-        if (name) {
-          const existingProduct = products.find(p => p.barcode === barcode && barcode !== '');
-          
-          const productData = {
-            name: name || 'Sin Nombre',
-            barcode: barcode || '',
-            category: (CATEGORIES.includes(category as any) ? category : 'Otros') as ProductCategory,
-            unit: (UNITS.includes(unit as any) ? unit : 'UNIDAD') as ProductUnit,
-            costPrice: Number(costPrice) || 0,
-            price: Number(price) || 0,
-            stock: Number(stock) || 0,
-            minStock: Number(minStock) || 0,
+        let rowName = '';
+        let rowBarcode = '';
+        let rowCategory = '';
+        let rowUnit = '';
+        let rowCostPrice: number | null = null;
+        let rowPrice: number | null = null;
+        let rowStock: number | null = null;
+        let rowMinStock: number | null = null;
+        let rowWholesalePrice: number | null = null;
+        let rowWholesaleMinQty: number | null = null;
+
+        if (hasRecognizedHeader) {
+          if (headerIndices.name !== undefined) rowName = cells[headerIndices.name] || '';
+          if (headerIndices.barcode !== undefined) rowBarcode = cells[headerIndices.barcode] || '';
+          if (headerIndices.category !== undefined) rowCategory = cells[headerIndices.category] || '';
+          if (headerIndices.unit !== undefined) rowUnit = cells[headerIndices.unit] || '';
+          if (headerIndices.costPrice !== undefined) rowCostPrice = parseNumber(cells[headerIndices.costPrice]);
+          if (headerIndices.price !== undefined) rowPrice = parseNumber(cells[headerIndices.price]);
+          if (headerIndices.stock !== undefined) rowStock = parseNumber(cells[headerIndices.stock]);
+          if (headerIndices.minStock !== undefined) rowMinStock = parseNumber(cells[headerIndices.minStock]);
+          if (headerIndices.wholesalePrice !== undefined) rowWholesalePrice = parseNumber(cells[headerIndices.wholesalePrice]);
+          if (headerIndices.wholesaleMinQty !== undefined) rowWholesaleMinQty = parseNumber(cells[headerIndices.wholesaleMinQty]);
+        } else {
+          // Fallback posicional estándar:
+          rowName = cells[0] || '';
+          rowBarcode = cells[1] || '';
+          rowCategory = cells[2] || '';
+          rowUnit = cells[3] || '';
+          rowCostPrice = parseNumber(cells[4]);
+          rowPrice = parseNumber(cells[5]);
+          rowStock = parseNumber(cells[6]);
+          rowMinStock = parseNumber(cells[7]);
+          rowWholesalePrice = parseNumber(cells[8]);
+          rowWholesaleMinQty = parseNumber(cells[9]);
+        }
+
+        rowName = rowName.trim();
+        rowBarcode = rowBarcode.trim();
+
+        // Debe tener al menos nombre o código de barra para ser un producto válido
+        if (!rowName && !rowBarcode) continue;
+
+        // Categoría y unidad
+        let matchedCategory: ProductCategory = 'Otros';
+        if (rowCategory) {
+          const normCat = normalizeStr(rowCategory);
+          const found = CATEGORIES.find(c => normalizeStr(c) === normCat);
+          if (found) matchedCategory = found;
+        }
+
+        let matchedUnit: ProductUnit = 'UNIDAD';
+        if (rowUnit) {
+          const normUnit = normalizeStr(rowUnit);
+          if (normUnit.includes('kilo') || normUnit === 'kg') matchedUnit = 'KILO';
+          else if (normUnit.includes('litro') || normUnit === 'lt' || normUnit === 'l') matchedUnit = 'LITRO';
+        }
+
+        // Búsqueda inteligente de producto existente para no duplicar:
+        let existingProduct: Product | undefined;
+
+        // 1. Coincidencia por código de barra (si la fila tiene código)
+        if (rowBarcode) {
+          existingProduct = currentProducts.find(
+            p => p.barcode && p.barcode.trim().toLowerCase() === rowBarcode.toLowerCase()
+          );
+        }
+
+        // 2. Si no encontró por código, coincidencia por Nombre exacto (insensible a mayúsculas/minúsculas)
+        if (!existingProduct && rowName) {
+          existingProduct = currentProducts.find(
+            p => p.name.trim().toLowerCase() === rowName.toLowerCase()
+          );
+        }
+
+        if (existingProduct) {
+          // ACTUALIZAR PRODUCTO EXISTENTE (conserva los campos que no vengan en el archivo)
+          const updateData: Partial<Product> = {
+            name: rowName || existingProduct.name,
+            barcode: rowBarcode || existingProduct.barcode,
+            category: rowCategory ? matchedCategory : existingProduct.category,
+            unit: rowUnit ? matchedUnit : existingProduct.unit,
+            costPrice: rowCostPrice !== null ? rowCostPrice : existingProduct.costPrice,
+            price: rowPrice !== null ? rowPrice : existingProduct.price,
+            stock: rowStock !== null ? rowStock : existingProduct.stock,
+            minStock: rowMinStock !== null ? rowMinStock : existingProduct.minStock,
+            wholesalePrice: rowWholesalePrice !== null ? rowWholesalePrice : existingProduct.wholesalePrice,
+            wholesaleMinQty: rowWholesaleMinQty !== null ? rowWholesaleMinQty : existingProduct.wholesaleMinQty,
             active: true
           };
 
-          if (existingProduct) {
-            updateProduct(existingProduct.id, productData);
-          } else {
-            addProduct(productData);
-          }
+          await updateProduct(existingProduct.id, updateData);
+          updatedCount++;
+
+          // Mantener sincronizado el array local de productos para siguientes líneas del mismo archivo
+          currentProducts = currentProducts.map(p => 
+            p.id === existingProduct!.id ? { ...p, ...updateData } : p
+          );
+        } else {
+          // CREAR NUEVO PRODUCTO
+          const newProduct = {
+            name: rowName || 'Sin Nombre',
+            barcode: rowBarcode || '',
+            category: matchedCategory,
+            unit: matchedUnit,
+            costPrice: rowCostPrice !== null ? rowCostPrice : 0,
+            price: rowPrice !== null ? rowPrice : 0,
+            stock: rowStock !== null ? rowStock : 0,
+            minStock: rowMinStock !== null ? rowMinStock : 5,
+            wholesalePrice: rowWholesalePrice,
+            wholesaleMinQty: rowWholesaleMinQty,
+            active: true
+          };
+
+          await addProduct(newProduct);
+          createdCount++;
+
+          // Sincronizar catálogo local
+          currentProducts = useInventoryStore.getState().products;
         }
       }
-      alert('Importación completada con éxito');
-    };
-    reader.readAsText(file);
+
+      await fetchProducts();
+      alert(`Importación completada con éxito:\n• ${updatedCount} productos actualizados\n• ${createdCount} productos nuevos creados`);
+    } catch (err) {
+      console.error('Error al importar archivo:', err);
+      alert('Ocurrió un error al procesar el archivo. Revisa el formato e intenta nuevamente.');
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -186,9 +391,14 @@ const Inventory: React.FC = () => {
         </div>
         {!isEmployee && (
           <div className="flex gap-3">
-            <label className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-2xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 cursor-pointer transition-all">
-              <Plus size={16} className="text-blue-600" /> Importar
-              <input type="file" className="hidden" accept=".csv,.txt" onChange={handleImport} />
+            <label className={`flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-2xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 cursor-pointer transition-all ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+              {isImporting ? (
+                <Loader2 size={16} className="text-blue-600 animate-spin" />
+              ) : (
+                <Plus size={16} className="text-blue-600" />
+              )}
+              {isImporting ? 'Importando...' : 'Importar'}
+              <input type="file" className="hidden" accept=".csv,.txt" onChange={handleImport} disabled={isImporting} />
             </label>
             <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
               <button 
