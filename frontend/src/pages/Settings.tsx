@@ -84,7 +84,7 @@ const Settings: React.FC = () => {
     fixedQrData: ''
   };
   const [mpStatusMessage, setMpStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-  const [availablePosList, setAvailablePosList] = useState<MPPos[]>([]);
+  const [availablePosList] = useState<MPPos[]>([]);
   const [showToken, setShowToken] = useState(false);
 
   const handleTestAndLoadMP = () => {
