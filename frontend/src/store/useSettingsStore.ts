@@ -5,6 +5,17 @@ import type { ScaleConfig } from '../services/scaleService';
 
 export type SubscriptionPlan = 'FREE' | 'STANDARD' | 'PRO';
 
+export interface MercadoPagoConfig {
+  accessToken: string;
+  posId: string;
+  externalPosId?: string;
+  posName?: string;
+  userId?: string;
+  isActive: boolean;
+  fixedQrImage?: string;
+  fixedQrData?: string;
+}
+
 interface BusinessInfo {
   name: string;
   address: string;
@@ -12,11 +23,7 @@ interface BusinessInfo {
   email: string;
   logo?: string;
   taxId: string;
-  mercadoPago: {
-    accessToken: string;
-    posId: string;
-    isActive: boolean;
-  };
+  mercadoPago: MercadoPagoConfig;
 }
 
 interface SettingsState {
@@ -50,6 +57,7 @@ interface SettingsState {
   updateDisplay: (disp: Partial<SettingsState['display']>) => void;
   updateSecurity: (sec: Partial<SettingsState['security']>) => void;
   updateScaleConfig: (cfg: Partial<ScaleConfig>) => void;
+  updateMercadoPago: (mp: Partial<MercadoPagoConfig>) => void;
   incrementSales: () => void;
   upgradePlan: (plan: SubscriptionPlan, cost: number) => void;
   deductDailyBalance: () => void;
@@ -114,6 +122,15 @@ export const useSettingsStore = create<SettingsState>()(
       updateDisplay: (disp) => set((state) => ({ display: { ...state.display, ...disp } })),
       updateSecurity: (sec) => set((state) => ({ security: { ...state.security, ...sec } })),
       updateScaleConfig: (cfg) => set((state) => ({ scaleConfig: { ...state.scaleConfig, ...cfg } })),
+      updateMercadoPago: (mp) => set((state) => ({
+        businessInfo: {
+          ...state.businessInfo,
+          mercadoPago: {
+            ...state.businessInfo.mercadoPago,
+            ...mp
+          }
+        }
+      })),
       incrementSales: () => set((state) => ({
         subscription: {
           ...state.subscription,

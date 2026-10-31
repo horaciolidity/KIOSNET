@@ -28,7 +28,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../utils/supabaseClient';
 import AudioHelper from '../utils/audioHelper';
 import { ScaleService } from '../services/scaleService';
-import axios from 'axios';
+import { MercadoPagoService } from '../services/mercadoPagoService';
 
 interface CartItem extends Product {
   quantity: number;
@@ -72,7 +72,6 @@ const POS: React.FC = () => {
   const activePlan = user?.subActive ? user?.plan : 'FREE';
   const isPro = activePlan === 'PRO';
   const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
-  const hasMP = isPro && businessInfo?.mercadoPago?.isActive;
 
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
   const isFreeTrialActive = (user?.salesCount ?? 0) < 50;
@@ -90,6 +89,8 @@ const POS: React.FC = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [isWaitingForMP, setIsWaitingForMP] = useState(false);
   const [mpInitPoint, setMpInitPoint] = useState<string>('');
+  const [mpQrData, setMpQrData] = useState<string>('');
+  const [mpQrImage, setMpQrImage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticketSize, setTicketSize] = useState<'80mm' | '58mm'>('80mm');
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
@@ -199,10 +200,14 @@ const POS: React.FC = () => {
         isWaitingForMP,
         change,
         amountPaid,
-        isFinished
+        isFinished,
+        mpInitPoint,
+        mpQrData,
+        mpQrImage,
+        showQrOnCustomerDisplay: isPro
       });
     }
-  }, [cart, total, paymentMethod, isWaitingForMP, change, amountPaid, isFinished]);
+  }, [cart, total, paymentMethod, isWaitingForMP, change, amountPaid, isFinished, mpInitPoint, mpQrData, mpQrImage, isPro]);
 
   // Handle request for state from newly opened display tab
   React.useEffect(() => {
@@ -216,7 +221,11 @@ const POS: React.FC = () => {
           isWaitingForMP,
           change,
           amountPaid,
-          isFinished
+          isFinished,
+          mpInitPoint,
+          mpQrData,
+          mpQrImage,
+          showQrOnCustomerDisplay: isPro
         });
       }
     };
@@ -224,7 +233,7 @@ const POS: React.FC = () => {
       broadcastChannelRef.current.addEventListener('message', handleMessage);
       return () => broadcastChannelRef.current?.removeEventListener('message', handleMessage);
     }
-  }, [cart, total, paymentMethod, isWaitingForMP, change, amountPaid, isFinished]);
+  }, [cart, total, paymentMethod, isWaitingForMP, change, amountPaid, isFinished, mpInitPoint, mpQrData, mpQrImage, isPro]);
 
   const finalizeTransaction = async () => {
     if (!user) {
@@ -361,6 +370,85 @@ const POS: React.FC = () => {
     }
   };
 
+  const approveSale = async (targetSaleId: string) => {
+    if ((window as any).mpPollInterval) {
+      clearInterval((window as any).mpPollInterval);
+      (window as any).mpPollInterval = null;
+    }
+
+    try {
+      // 1. Mark sale as completed in Supabase
+      await supabase
+        .from('Sale')
+        .update({ status: 'COMPLETED' })
+        .eq('id', targetSaleId);
+
+      // 2. Create sale items
+      await supabase
+        .from('SaleItem')
+        .insert(cart.map(item => ({
+          id: crypto.randomUUID(),
+          saleId: targetSaleId,
+          productId: item.id,
+          quantity: Number(item.quantity),
+          price: Number(item.price),
+          costPrice: Number(item.costPrice)
+        })));
+
+      // 3. Decrement physical stock
+      for (const item of cart) {
+        const { data: prod } = await supabase
+          .from('Product')
+          .select('stock')
+          .eq('id', item.id)
+          .single();
+
+        const currentStock = prod?.stock || 0;
+        await supabase
+          .from('Product')
+          .update({ stock: currentStock - item.quantity })
+          .eq('id', item.id);
+      }
+      
+      // Refresh stores
+      useInventoryStore.getState().fetchProducts();
+      useCustomerStore.getState().fetchCustomers();
+
+      // Register local cash transaction
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      const customerName = customer ? customer.name : '';
+
+      addTransaction({
+        type: 'VENTA',
+        amount: total,
+        profit: profit,
+        method: 'TRANSFERENCIA',
+        description: `Venta QR MP ${targetSaleId.substring(0, 8)} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
+        details: {
+          items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            category: item.category
+          })),
+          saleId: targetSaleId,
+          note: 'Cobro con QR Mercado Pago',
+          customerId: selectedCustomerId
+        }
+      });
+
+      setIsFinished(true);
+      setIsWaitingForMP(false);
+      setMpInitPoint('');
+      setMpQrData('');
+      setMpQrImage('');
+      useSettingsStore.getState().incrementSales();
+    } catch (err) {
+      console.error('Error aprobando venta:', err);
+      alert('Error registrando la venta. Revise la conexión e intente nuevamente.');
+    }
+  };
+
   const handleFinishSale = async () => {
     if (isSubmitting) return;
 
@@ -380,6 +468,7 @@ const POS: React.FC = () => {
       setIsWaitingForMP(true);
       try {
         const pendingSaleId = crypto.randomUUID();
+        setSaleId(pendingSaleId);
 
         // 1. Create pending sale in DB
         const { error: saleErr } = await supabase
@@ -401,125 +490,62 @@ const POS: React.FC = () => {
 
         if (saleErr) throw saleErr;
 
-        // 2. Request Mercado Pago Checkout preference directly
-        const token = businessInfo?.mercadoPago?.accessToken || 'APP_USR-4849164774633719-051714-00b8cfd0d13fdaf15a8646fe8447a2cc-345296566';
-        const mpResponse = await axios.post(
-          'https://api.mercadopago.com/checkout/preferences',
-          {
-            items: cart.map(item => ({
-              id: item.id,
-              title: item.name,
-              quantity: Number(item.quantity),
-              unit_price: Number(item.price),
-              currency_id: 'ARS'
-            })),
-            external_reference: pendingSaleId
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
+        const mp = businessInfo?.mercadoPago;
+        const token = mp?.accessToken;
+
+        // If a fixed QR image or data was configured in settings, use it as preview
+        if (mp?.fixedQrImage) {
+          setMpQrImage(mp.fixedQrImage);
+        }
+        if (mp?.fixedQrData) {
+          setMpQrData(mp.fixedQrData);
+        }
+
+        if (token) {
+          // 2. If user ID & POS are configured, send order to in-store POS (desk printed QR)
+          const externalPos = mp.externalPosId || mp.posId;
+          if (mp.userId && externalPos) {
+            await MercadoPagoService.createInStoreOrder({
+              token,
+              userId: mp.userId,
+              externalPosId: externalPos,
+              saleId: pendingSaleId,
+              total,
+              items: cart
+            });
           }
-        );
 
-        const initPoint = mpResponse.data.init_point;
-        setSaleId(pendingSaleId);
-        setMpInitPoint(initPoint);
-        setIsSubmitting(false);
+          // 3. Create preference for screen display QR
+          const prefRes = await MercadoPagoService.createPreferenceOrder({
+            token,
+            saleId: pendingSaleId,
+            total,
+            items: cart
+          });
 
-        // 3. Poll Mercado Pago API directly to check if the payment is approved
-        const pollInterval = setInterval(async () => {
-          try {
-            const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${pendingSaleId}`;
-            const mpSearchResponse = await axios.get(
-              `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`
-                }
-              }
-            );
+          if (prefRes.success && prefRes.initPoint) {
+            setMpInitPoint(prefRes.initPoint);
+            setMpQrData(prefRes.initPoint);
+          }
 
-            const approvedPayment = mpSearchResponse.data.results?.find((p: any) => p.status === 'approved');
-            if (approvedPayment) {
+          // 4. Poll status to auto-approve
+          const pollInterval = setInterval(async () => {
+            const isApproved = await MercadoPagoService.checkPaymentApproved(token, pendingSaleId);
+            if (isApproved) {
               clearInterval(pollInterval);
-
-              // 4. Mark sale as completed in Supabase
-              await supabase
-                .from('Sale')
-                .update({ status: 'COMPLETED' })
-                .eq('id', pendingSaleId);
-
-              // 5. Create sale items
-              await supabase
-                .from('SaleItem')
-                .insert(cart.map(item => ({
-                  id: crypto.randomUUID(),
-                  saleId: pendingSaleId,
-                  productId: item.id,
-                  quantity: Number(item.quantity),
-                  price: Number(item.price),
-                  costPrice: Number(item.costPrice)
-                })));
-
-              // 6. Decrement physical stock
-              for (const item of cart) {
-                const { data: prod } = await supabase
-                  .from('Product')
-                  .select('stock')
-                  .eq('id', item.id)
-                  .single();
-
-                const currentStock = prod?.stock || 0;
-                await supabase
-                  .from('Product')
-                  .update({ stock: currentStock - item.quantity })
-                  .eq('id', item.id);
-              }
-              
-              // Refresh stores
-              useInventoryStore.getState().fetchProducts();
-              useCustomerStore.getState().fetchCustomers();
-
-              // Register local cash transaction
-              const customer = customers.find(c => c.id === selectedCustomerId);
-              const customerName = customer ? customer.name : '';
-
-              addTransaction({
-                type: 'VENTA',
-                amount: total,
-                profit: profit,
-                method: 'TRANSFERENCIA',
-                description: `Venta MP QR ${pendingSaleId} ${customerName ? `(Cliente: ${customerName})` : ''} ${note ? '- ' + note : ''}`,
-                details: {
-                  items: cart.map(item => ({
-                    name: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                    category: item.category
-                  })),
-                  saleId: pendingSaleId,
-                  note: 'Aprobado vía Consulta Directa a Mercado Pago',
-                  customerId: selectedCustomerId
-                }
-              });
-
-              setIsFinished(true);
-              setIsWaitingForMP(false);
-              setMpInitPoint('');
-              useSettingsStore.getState().incrementSales();
+              (window as any).mpPollInterval = null;
+              await approveSale(pendingSaleId);
             }
-          } catch (err) {
-            console.error('Error polling status from Mercado Pago:', err);
-          }
-        }, 2000);
+          }, 2500);
 
-        // Store poll interval globally to clear it later
-        (window as any).mpPollInterval = pollInterval;
+          (window as any).mpPollInterval = pollInterval;
+        }
+
+        setIsSubmitting(false);
 
       } catch (error: any) {
         console.error('Error starting Mercado Pago transaction:', error);
-        alert('Hubo un error al conectar con Mercado Pago. Intente nuevamente.');
+        alert('Hubo un error al preparar el cobro con Mercado Pago. Verifique la conexión.');
         setIsWaitingForMP(false);
         setIsSubmitting(false);
       }
@@ -541,6 +567,8 @@ const POS: React.FC = () => {
     setSaleId('');
     setSelectedCustomerId('');
     setMpInitPoint('');
+    setMpQrData('');
+    setMpQrImage('');
     setTicketSize('80mm');
   };
 
@@ -1097,23 +1125,25 @@ const POS: React.FC = () => {
                     <h2 className="text-2xl font-black text-slate-900 dark:text-white">Finalizar Venta</h2>
                     <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"><X size={24}/></button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                     <PaymentMethodBtn active={paymentMethod === 'EFECTIVO'} onClick={() => setPaymentMethod('EFECTIVO')} icon={<Banknote size={24}/>} label="Efectivo" />
                     <PaymentMethodBtn active={paymentMethod === 'TRANSFERENCIA'} onClick={() => setPaymentMethod('TRANSFERENCIA')} icon={<SendHorizontal size={24}/>} label="Transf." />
                     <PaymentMethodBtn active={paymentMethod === 'DEBITO'} onClick={() => setPaymentMethod('DEBITO')} icon={<CreditCard size={24}/>} label="Débito" />
-                    <PaymentMethodBtn active={paymentMethod === 'CREDITO'} onClick={() => setPaymentMethod('CREDITO')} icon={<CreditCard size={24}/>} label="Crédito" />
+                    <PaymentMethodBtn active={paymentMethod === 'MERCADOPAGO'} onClick={() => setPaymentMethod('MERCADOPAGO')} icon={<QrCode size={24} className="text-[#009EE3]" />} label="Pago con QR" />
                     {isStandardOrPro && (
                       <PaymentMethodBtn active={paymentMethod === 'CUENTA_CORRIENTE'} onClick={() => setPaymentMethod('CUENTA_CORRIENTE')} icon={<UserPlus size={24}/>} label="Cta. Cte" />
-                    )}
-                    {hasMP && (
-                      <PaymentMethodBtn active={paymentMethod === 'MERCADOPAGO'} onClick={() => setPaymentMethod('MERCADOPAGO')} icon={<QrCode size={24}/>} label="QR MP" />
                     )}
                   </div>
 
                   {paymentMethod === 'MERCADOPAGO' && (
-                    <div className="bg-[#009EE3]/10 p-6 rounded-[32px] border border-[#009EE3]/20 space-y-4">
-                      <p className="text-xs font-black uppercase tracking-widest text-[#009EE3]">Pago con QR Dinámico</p>
-                      <p className="text-slate-600 dark:text-slate-300 text-sm font-medium">Al confirmar, el total a cobrar se enviará automáticamente a tu lector QR de Mercado Pago. Espera a que el cliente escanee y pague.</p>
+                    <div className="bg-[#009EE3]/10 p-6 rounded-[32px] border border-[#009EE3]/20 space-y-3">
+                      <div className="flex items-center gap-2 text-[#009EE3]">
+                        <QrCode size={20} />
+                        <p className="text-xs font-black uppercase tracking-widest">Cobro con QR Mercado Pago</p>
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-300 text-sm font-medium">
+                        Al confirmar, se preparará el cobro por <strong>${total.toLocaleString()}</strong>. El cliente podrá escanear el QR físico de tu mostrador o el QR que aparecerá en pantalla.
+                      </p>
                     </div>
                   )}
 
@@ -1174,43 +1204,67 @@ const POS: React.FC = () => {
                 </div>
               </>
             ) : isWaitingForMP ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-6 bg-slate-900 text-white min-h-[500px]">
-                <h2 className="text-3xl font-black text-[#009EE3] flex items-center gap-2">
-                  <QrCode size={36} /> Mercado Pago
-                </h2>
-                <div className="bg-white p-4 rounded-3xl shadow-xl animate-in zoom-in-95 duration-300">
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-5 bg-slate-900 text-white min-h-[520px] overflow-y-auto">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-black text-[#009EE3] flex items-center gap-2">
+                    <QrCode size={30} /> Mercado Pago QR
+                  </span>
+                  <span className="bg-[#009EE3]/20 text-[#009EE3] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border border-[#009EE3]/30">
+                    Cobro Activo
+                  </span>
+                </div>
+
+                {/* QR Display */}
+                <div className="bg-white p-3.5 rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300 border-4 border-[#009EE3]">
                   <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mpInitPoint)}`} 
+                    src={mpQrImage || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(mpQrData || mpInitPoint || 'https://link.mercadopago.com.ar')}`} 
                     alt="QR Mercado Pago" 
-                    className="w-[220px] h-[220px]"
+                    className="w-[190px] h-[190px] object-contain rounded-xl"
                   />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold">Escanee para Pagar</h3>
-                  <p className="text-slate-400 text-sm max-w-xs mx-auto">Escanea el código QR dinámico desde la App de Mercado Pago o tu banco para completar el pago de <strong>${total.toLocaleString()}</strong>.</p>
+
+                <div className="space-y-1">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Total a Abonar</p>
+                  <h3 className="text-4xl font-black text-white tracking-tight">${total.toLocaleString()}</h3>
+                  <p className="text-slate-400 text-xs max-w-sm mx-auto pt-1 leading-relaxed">
+                    El cliente puede escanear este <strong>código QR en pantalla</strong> o el <strong>cartel físico pegado en el mostrador</strong> con la app de Mercado Pago.
+                  </p>
                 </div>
-                <div className="flex items-center gap-3 text-slate-300 bg-white/5 px-6 py-3 rounded-full text-sm font-bold">
-                  <Loader2 className="animate-spin text-[#009EE3]" size={18} />
-                  Aguardando confirmación de pago...
+
+                <div className="flex items-center gap-2 text-slate-300 bg-white/5 px-4 py-2 rounded-full text-xs font-semibold border border-white/10">
+                  <Loader2 className="animate-spin text-[#009EE3]" size={15} />
+                  <span>Aguardando confirmación automática...</span>
                 </div>
-                <button 
-                  onClick={resetPOS}
-                  className="text-red-400 hover:text-red-300 font-bold text-sm underline pt-2"
-                >
-                  Cancelar Pago
-                </button>
-                <div className="border-t border-white/5 my-2 pt-4 w-full max-w-xs"></div>
-                <a
-                  href={`https://wa.me/5492617048835?text=${encodeURIComponent(`Hola! Tengo un inconveniente con el cobro de una venta de $${total.toLocaleString()} (Venta ID: ${saleId}) en KIOSNET.`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-bold transition-all uppercase tracking-wider w-full max-w-xs cursor-pointer"
-                >
-                  <svg className="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24">
-                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-1.921c1.554.922 3.19 1.408 4.887 1.409 5.864 0 10.635-4.757 10.638-10.613.002-2.836-1.1-5.503-3.102-7.51-2.003-2.008-4.667-3.112-7.502-3.113-5.869 0-10.64 4.757-10.643 10.615-.001 1.83.488 3.619 1.417 5.176L1.83 22.097l5.062-1.849zm12.015-8.18c-.31-.156-1.839-.908-2.11-.1-.271.1-.387.417-.474.517-.087.1-.175.111-.486-.044-.31-.156-1.31-.483-2.495-1.54-.922-.822-1.543-1.838-1.724-2.15-.18-.31-.019-.478.136-.633.14-.139.31-.361.466-.543.156-.183.208-.313.31-.522.104-.21.052-.392-.026-.549-.078-.156-.685-1.651-.938-2.26-.247-.594-.499-.514-.685-.523-.175-.009-.377-.01-.58-.01a1.116 1.116 0 00-.809.378c-.277.311-1.057 1.033-1.057 2.52 0 1.487 1.082 2.922 1.232 3.122.15.2.2.13 1.134 3.013.9.78 1.637 1.543 2.5 1.868.863.325 1.653.24 2.273.15.688-.1 1.839-.751 2.1-.1.26.65.26 1.205.13 1.438-.13.233-.387.35-.698.506z"/>
-                  </svg>
-                  Reportar error por WhatsApp
-                </a>
+
+                {/* Action Buttons */}
+                <div className="w-full max-w-sm space-y-2.5 pt-1">
+                  <button 
+                    type="button"
+                    onClick={() => approveSale(saleId)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <CheckCircle2 size={18} /> Confirmar Pago Recibido (Manual)
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={resetPOS}
+                    className="text-red-400 hover:text-red-300 font-bold text-xs underline cursor-pointer"
+                  >
+                    Cancelar Cobro
+                  </button>
+                </div>
+
+                <div className="border-t border-white/5 pt-2 w-full max-w-xs">
+                  <a
+                    href={`https://wa.me/5492617048835?text=${encodeURIComponent(`Hola! Tengo un inconveniente con el cobro de una venta de $${total.toLocaleString()} (Venta ID: ${saleId}) en KIOSNET.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-xl text-[11px] font-bold transition-all uppercase tracking-wider w-full cursor-pointer"
+                  >
+                    Reportar por WhatsApp
+                  </a>
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-8 animate-in zoom-in-95 duration-300 overflow-y-auto">

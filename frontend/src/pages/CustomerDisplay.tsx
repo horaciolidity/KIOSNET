@@ -91,15 +91,25 @@ const CustomerDisplay: React.FC = () => {
             
             <div className="space-y-4 mt-8">
               {displayData.isWaitingForMP && displayData.paymentMethod === 'MERCADOPAGO' ? (
-                <div className="bg-white p-6 rounded-[32px] text-center animate-in zoom-in-95">
-                  <p className="font-black text-slate-900 mb-4 text-lg">Paga con Mercado Pago</p>
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://link.mercadopago.com.ar/qr_dinamico`} 
-                    alt="QR MP" 
-                    className="w-full h-auto rounded-xl shadow-sm"
-                  />
-                  <p className="text-blue-600 font-bold mt-4 animate-pulse">Esperando tu pago...</p>
-                </div>
+                displayData.showQrOnCustomerDisplay ? (
+                  <div className="bg-white p-6 rounded-[32px] text-center animate-in zoom-in-95 shadow-xl">
+                    <p className="font-black text-slate-900 mb-2 text-lg">Paga con Mercado Pago</p>
+                    <p className="text-slate-500 font-bold text-xs mb-3">Escanea con tu celular para abonar</p>
+                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center justify-center">
+                      <img 
+                        src={displayData.mpQrImage || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(displayData.mpQrData || displayData.mpInitPoint || 'https://link.mercadopago.com.ar')}`} 
+                        alt="QR MP" 
+                        className="w-48 h-48 rounded-xl object-contain"
+                      />
+                    </div>
+                    <p className="text-[#009EE3] font-bold mt-4 text-xs animate-pulse">Aguardando tu pago...</p>
+                  </div>
+                ) : (
+                  <div className="bg-white/10 p-6 rounded-[32px] text-center space-y-2 animate-in zoom-in-95">
+                    <p className="font-black text-white text-lg">Cobro con Mercado Pago</p>
+                    <p className="text-blue-200 text-sm">Por favor, escanea el código QR en el mostrador para completar tu pago.</p>
+                  </div>
+                )
               ) : (
                 displayData.paymentMethod === 'EFECTIVO' && Number(displayData.amountPaid) > 0 ? (
                   <div className="bg-white/10 p-6 rounded-[32px] space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">

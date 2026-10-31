@@ -14,11 +14,20 @@ import {
   Cpu,
   Barcode,
   Sliders,
-  Play
+  Play,
+  QrCode,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  Upload,
+  Sparkles
 } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { ScaleService } from '../services/scaleService';
+import { MercadoPagoService, MP_DIRECT_LINKS, type MPPos } from '../services/mercadoPagoService';
 
 const Settings: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string | null>('business');
@@ -60,8 +69,84 @@ const Settings: React.FC = () => {
     updateNotifications, 
     updateDisplay,
     updateSecurity,
-    updateScaleConfig
+    updateScaleConfig,
+    updateMercadoPago
   } = store;
+
+  // Mercado Pago states
+  const mpConfig = businessInfo.mercadoPago || {
+    accessToken: '',
+    posId: '',
+    externalPosId: '',
+    posName: '',
+    userId: '',
+    isActive: false,
+    fixedQrImage: '',
+    fixedQrData: ''
+  };
+  const [mpLoading, setMpLoading] = useState(false);
+  const [mpStatusMessage, setMpStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [availablePosList, setAvailablePosList] = useState<MPPos[]>([]);
+  const [showToken, setShowToken] = useState(false);
+
+  const handleTestAndLoadMP = async () => {
+    if (!mpConfig.accessToken || !mpConfig.accessToken.trim()) {
+      setMpStatusMessage({ type: 'error', text: 'Por favor ingresa primero tu Access Token.' });
+      return;
+    }
+    setMpLoading(true);
+    setMpStatusMessage(null);
+    
+    const validation = await MercadoPagoService.validateTokenAndGetInfo(mpConfig.accessToken);
+    if (!validation.success) {
+      setMpLoading(false);
+      setMpStatusMessage({ type: 'error', text: validation.message });
+      return;
+    }
+
+    // Get POS list
+    const posRes = await MercadoPagoService.getPosList(mpConfig.accessToken);
+    setMpLoading(false);
+    
+    updateMercadoPago({
+      userId: String(validation.data?.id || ''),
+      isActive: true
+    });
+
+    if (posRes.success && posRes.posList.length > 0) {
+      setAvailablePosList(posRes.posList);
+      if (!mpConfig.posId) {
+        const first = posRes.posList[0];
+        updateMercadoPago({
+          posId: String(first.id),
+          externalPosId: first.external_id || String(first.id),
+          posName: first.name,
+          fixedQrData: first.qr?.qr_code || '',
+          fixedQrImage: first.qr?.image || ''
+        });
+      }
+      setMpStatusMessage({
+        type: 'success',
+        text: `¡Conexión exitosa con ${validation.data?.nickname || 'Mercado Pago'}! Se cargaron ${posRes.posList.length} caja(s).`
+      });
+    } else {
+      setMpStatusMessage({
+        type: 'success',
+        text: `¡Token verificado correctamente (${validation.data?.nickname || 'Mercado Pago'})! Puedes ingresar el ID de caja manualmente si lo deseas.`
+      });
+    }
+  };
+
+  const handleQrImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateMercadoPago({ fixedQrImage: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const [testDirectStatus, setTestDirectStatus] = useState<{ connected: boolean; weight: number }>({ connected: false, weight: 0 });
   const [testDirectMessage, setTestDirectMessage] = useState('');
@@ -133,6 +218,12 @@ const Settings: React.FC = () => {
             title="Balanzas y Periféricos" 
             active={activeSection === 'peripherals'} 
             onClick={() => setActiveSection('peripherals')}
+          />
+          <NavButton 
+            icon={<QrCode size={20} className="text-[#009EE3]" />} 
+            title="Mercado Pago (Cobro QR)" 
+            active={activeSection === 'mercadopago'} 
+            onClick={() => setActiveSection('mercadopago')}
           />
           <NavButton 
             icon={<CreditCard size={20} />} 
@@ -573,9 +664,264 @@ const Settings: React.FC = () => {
                   </div>
                 )}
 
+                {activeSection === 'mercadopago' && (
+                  <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <QrCode className="text-[#009EE3]" /> Configuración de Mercado Pago (Cobro QR)
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Conecta tu cuenta para enviar el total de cada venta automáticamente a tu QR físico o digital.
+                        </p>
+                      </div>
+                      <span className="bg-[#009EE3]/10 text-[#009EE3] text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-[#009EE3]/20">
+                        QR Integrado
+                      </span>
+                    </div>
 
+                    {/* Master Toggle */}
+                    <Toggle 
+                      label="Habilitar Cobro con QR Mercado Pago" 
+                      description="Reemplaza la opción de Crédito por Pago con QR en el Punto de Venta."
+                      checked={mpConfig.isActive}
+                      onChange={(val: boolean) => updateMercadoPago({ isActive: val })}
+                    />
 
+                    {/* DIRECT LINKS BANNER */}
+                    <div className="bg-gradient-to-br from-[#009EE3]/10 via-[#009EE3]/5 to-transparent p-6 rounded-3xl border border-[#009EE3]/20 space-y-4">
+                      <div className="flex items-center gap-2 text-[#009EE3]">
+                        <Sparkles size={18} />
+                        <h4 className="font-black text-sm uppercase tracking-wider">Enlaces Directos de tu Cuenta</h4>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        Haz clic en estos enlaces para abrir directamente tu Mercado Pago, copiar tus datos y pegarlos aquí:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <a 
+                          href={MP_DIRECT_LINKS.credentials}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-[#009EE3]/30 hover:border-[#009EE3] hover:shadow-md transition-all group cursor-pointer"
+                        >
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white block group-hover:text-[#009EE3] transition-colors">
+                              1. Copiar mi Access Token
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              Panel de Desarrolladores MP
+                            </span>
+                          </div>
+                          <ExternalLink size={16} className="text-[#009EE3]" />
+                        </a>
 
+                        <a 
+                          href={MP_DIRECT_LINKS.storesAndPos}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-[#009EE3]/30 hover:border-[#009EE3] hover:shadow-md transition-all group cursor-pointer"
+                        >
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white block group-hover:text-[#009EE3] transition-colors">
+                              2. Ver mis Cajas & Imprimir QR
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              Locales y Cajas del Negocio
+                            </span>
+                          </div>
+                          <ExternalLink size={16} className="text-[#009EE3]" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* TOKEN CONFIGURATION */}
+                    <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                      <div>
+                        <label className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                          Access Token de Producción
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Empieza con <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded text-[11px]">APP_USR-...</code>
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input 
+                            type={showToken ? 'text' : 'password'}
+                            placeholder="APP_USR-0000000000000000-000000-..."
+                            value={mpConfig.accessToken || ''}
+                            onChange={(e) => updateMercadoPago({ accessToken: e.target.value.trim() })}
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3.5 pl-4 pr-12 text-slate-900 dark:text-white text-sm font-mono outline-none focus:ring-2 focus:ring-[#009EE3]/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowToken(!showToken)}
+                            className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          >
+                            {showToken ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleTestAndLoadMP}
+                          disabled={mpLoading || !mpConfig.accessToken}
+                          className="bg-[#009EE3] hover:bg-[#0088c4] text-white px-5 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-[#009EE3]/20 disabled:opacity-50 cursor-pointer"
+                        >
+                          {mpLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                          Conectar
+                        </button>
+                      </div>
+
+                      {/* Status Feedback Message */}
+                      {mpStatusMessage && (
+                        <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 ${
+                          mpStatusMessage.type === 'success' 
+                            ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20'
+                            : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-500/20'
+                        }`}>
+                          {mpStatusMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                          <span>{mpStatusMessage.text}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* POS / CAJA CONFIGURATION */}
+                    <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                          Caja / Punto de Venta Vinculado
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Selecciona cuál de tus cajas de Mercado Pago tiene el código QR impreso en el mostrador.
+                        </p>
+                      </div>
+
+                      {availablePosList.length > 0 ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Seleccionar Caja:</label>
+                          <select
+                            value={mpConfig.posId || ''}
+                            onChange={(e) => {
+                              const selected = availablePosList.find(p => String(p.id) === e.target.value);
+                              if (selected) {
+                                updateMercadoPago({
+                                  posId: String(selected.id),
+                                  externalPosId: selected.external_id || String(selected.id),
+                                  posName: selected.name,
+                                  fixedQrData: selected.qr?.qr_code || '',
+                                  fixedQrImage: selected.qr?.image || mpConfig.fixedQrImage || ''
+                                });
+                              }
+                            }}
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3.5 px-4 font-bold text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#009EE3]/20"
+                          >
+                            <option value="">-- Seleccionar caja detectada --</option>
+                            {availablePosList.map(p => (
+                              <option key={p.id} value={String(p.id)}>
+                                {p.name} (ID: {p.id}{p.external_id ? ` - Cod: ${p.external_id}` : ''})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                            ID de Caja / POS ID
+                          </label>
+                          <input 
+                            type="text" 
+                            placeholder="Ej: 12345678"
+                            value={mpConfig.posId || ''}
+                            onChange={(e) => updateMercadoPago({ posId: e.target.value })}
+                            className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                            Código Externo de Caja (Opcional)
+                          </label>
+                          <input 
+                            type="text" 
+                            placeholder="Ej: CAJA1 o CAJAPRINCIPAL"
+                            value={mpConfig.externalPosId || ''}
+                            onChange={(e) => updateMercadoPago({ externalPosId: e.target.value })}
+                            className="w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FIXED QR IMAGE OR LINK PREVIEW */}
+                    <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-base">
+                          Código QR de la Tienda (Respaldo en Pantalla)
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Si tienes una foto o imagen de tu QR fijo de mostrador, puedes subirla aquí para que la app siempre tenga una copia lista.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-6">
+                        {mpConfig.fixedQrImage ? (
+                          <div className="relative group bg-white p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <img 
+                              src={mpConfig.fixedQrImage} 
+                              alt="QR Mostrador" 
+                              className="w-36 h-36 object-contain rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => updateMercadoPago({ fixedQrImage: '' })}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full text-xs shadow-md opacity-90 hover:opacity-100"
+                              title="Eliminar imagen"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-36 h-36 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                            <QrCode size={36} className="opacity-40 mb-2" />
+                            <span className="text-[10px] font-bold">Sin imagen cargada</span>
+                          </div>
+                        )}
+
+                        <div className="flex-1 space-y-3">
+                          <label className="inline-flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-[#009EE3] text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-sm">
+                            <Upload size={16} className="text-[#009EE3]" />
+                            <span>Subir imagen o foto del QR</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleQrImageUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Formato recomendado: JPG o PNG. Si no subes una imagen, el sistema generará el QR dinámico automáticamente al cobrar.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PLAN PRO BADGE NOTE */}
+                    <div className="p-4 bg-indigo-50/60 dark:bg-indigo-500/10 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 flex items-start gap-3">
+                      <Sparkles className="text-indigo-600 shrink-0 mt-0.5" size={18} />
+                      <div className="text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+                        <p className="font-bold">Diferenciación por Plan:</p>
+                        <p className="text-indigo-700 dark:text-indigo-300">
+                          <strong>Plan Estándar:</strong> El cobro con QR está disponible en la pantalla del POS y funciona con el QR impreso en el mostrador.
+                        </p>
+                        <p className="text-indigo-700 dark:text-indigo-300">
+                          <strong>Plan PRO:</strong> Además de lo anterior, el código QR y el total a pagar se proyectan en tiempo real en la <strong>Pantalla Cliente</strong> para que el cliente lo escanee directo desde la segunda pantalla.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex justify-end">
