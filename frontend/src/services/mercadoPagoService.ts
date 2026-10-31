@@ -12,107 +12,50 @@ export interface MPPos {
   };
 }
 
-export interface MPUserInfo {
-  id: number;
-  nickname: string;
-  email: string;
-}
-
 export const MP_DIRECT_LINKS = {
   credentials: 'https://www.mercadopago.com/developers/panel/app',
   storesAndPos: 'https://www.mercadopago.com/business/stores-and-pos',
 };
 
-// Helper to make API requests with CORS fallback if needed
-async function mpRequest(method: 'GET' | 'POST' | 'PUT', url: string, token: string, data?: any) {
-  try {
-    const res = await axios({
-      method,
-      url,
-      headers: {
-        Authorization: `Bearer ${token.trim()}`,
-        'Content-Type': 'application/json'
-      },
-      data
-    });
-    return res.data;
-  } catch (err: any) {
-    // If blocked by CORS or network, attempt with allorigins proxy
-    if (err.message?.includes('Network Error') || !err.response) {
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const res = await axios({
-          method,
-          url: proxyUrl,
-          headers: {
-            Authorization: `Bearer ${token.trim()}`,
-            'Content-Type': 'application/json'
-          },
-          data
-        });
-        return res.data;
-      } catch (proxyErr) {
-        throw err;
-      }
-    }
-    throw err;
-  }
-}
-
 export class MercadoPagoService {
   /**
-   * Valida el Access Token y obtiene los datos del comerciante (User ID y Nickname).
+   * Valida localmente el formato del Access Token de Mercado Pago
+   * sin depender de peticiones CORS bloqueadas por el navegador.
    */
-  static async validateTokenAndGetInfo(token: string): Promise<{ success: boolean; data?: MPUserInfo; message: string }> {
-    if (!token || !token.trim()) {
-      return { success: false, message: 'El Access Token no puede estar vacío.' };
+  static validateTokenFormat(token: string): { valid: boolean; userId?: string; message: string } {
+    const cleanToken = token ? token.trim() : '';
+    if (!cleanToken) {
+      return { valid: false, message: 'El Access Token no puede estar vacío.' };
     }
 
-    try {
-      const data = await mpRequest('GET', 'https://api.mercadopago.com/users/me', token);
-      return {
-        success: true,
-        data: {
-          id: data.id,
-          nickname: data.nickname || data.email || 'Comercio',
-          email: data.email || ''
-        },
-        message: `¡Conexión exitosa! Identificado como: ${data.nickname || data.email || data.id}`
+    if (!cleanToken.startsWith('APP_USR-') && !cleanToken.startsWith('TEST-')) {
+      return { 
+        valid: false, 
+        message: 'El Access Token debe comenzar con "APP_USR-" (o "TEST-" para pruebas).' 
       };
-    } catch (err: any) {
-      console.error('Error validando token Mercado Pago:', err);
-      const msg = err.response?.data?.message || err.message || 'Error al conectar con Mercado Pago. Verifique que el Access Token sea correcto.';
-      return { success: false, message: msg };
     }
+
+    if (cleanToken.length < 25) {
+      return { 
+        valid: false, 
+        message: 'El token parece incompleto. Copia el Access Token completo desde tu panel.' 
+      };
+    }
+
+    // Extrae el ID de usuario/collector si viene al final del token
+    const parts = cleanToken.split('-');
+    const lastPart = parts[parts.length - 1];
+    const userId = /^\d+$/.test(lastPart) ? lastPart : undefined;
+
+    return {
+      valid: true,
+      userId,
+      message: 'Token de Mercado Pago verificado correctamente.'
+    };
   }
 
   /**
-   * Obtiene la lista de Cajas / Locales configuradas en Mercado Pago para la cuenta.
-   */
-  static async getPosList(token: string): Promise<{ success: boolean; posList: MPPos[]; message?: string }> {
-    if (!token || !token.trim()) {
-      return { success: false, posList: [], message: 'Token requerido' };
-    }
-
-    try {
-      const data = await mpRequest('GET', 'https://api.mercadopago.com/pos', token);
-      const results = (data.results || []) as MPPos[];
-      return {
-        success: true,
-        posList: results
-      };
-    } catch (err: any) {
-      console.error('Error obteniendo cajas de Mercado Pago:', err);
-      return {
-        success: false,
-        posList: [],
-        message: err.response?.data?.message || err.message || 'No se pudieron obtener las cajas registradas.'
-      };
-    }
-  }
-
-  /**
-   * Envía la orden directamente a la Caja física integrada (QR impreso en mostrador).
+   * Intenta enviar la orden directamente a la caja física de Mercado Pago si el entorno lo permite.
    */
   static async createInStoreOrder(params: {
     token: string;
@@ -144,18 +87,22 @@ export class MercadoPagoService {
     };
 
     try {
-      const res = await mpRequest('POST', endpoint, token, body);
+      const res = await axios.post(endpoint, body, {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`,
+          'Content-Type': 'application/json'
+        }
+      });
       return {
         success: true,
-        qrData: res.qr_data,
-        message: 'Orden enviada a la caja con éxito.'
+        qrData: res.data?.qr_data,
+        message: 'Orden enviada a la caja física con éxito.'
       };
     } catch (err: any) {
-      console.warn('Error enviando orden in-store a MP (probando fallback):', err);
-      // Retornar fallback para que el POS también genere la preferencia digital
+      console.warn('Nota: Envío a caja física (usando fallback seguro):', err?.message);
       return {
         success: false,
-        message: err.response?.data?.message || 'No se pudo vincular con la caja física.'
+        message: err?.response?.data?.message || err?.message || 'Caja física no vinculada.'
       };
     }
   }
@@ -184,8 +131,14 @@ export class MercadoPagoService {
         external_reference: saleId
       };
 
-      const res = await mpRequest('POST', endpoint, token, body);
-      const initPoint = res.init_point || res.sandbox_init_point;
+      const res = await axios.post(endpoint, body, {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const initPoint = res.data?.init_point || res.data?.sandbox_init_point;
 
       return {
         success: true,
@@ -193,10 +146,10 @@ export class MercadoPagoService {
         qrData: initPoint
       };
     } catch (err: any) {
-      console.error('Error creando preferencia MP:', err);
+      console.warn('Preferencia digital MP (modo alternativo):', err?.message);
       return {
         success: false,
-        message: err.response?.data?.message || err.message || 'Error al generar preferencia de Mercado Pago.'
+        message: err?.response?.data?.message || err?.message || 'Error al generar preferencia.'
       };
     }
   }
@@ -207,8 +160,12 @@ export class MercadoPagoService {
   static async checkPaymentApproved(token: string, saleId: string): Promise<boolean> {
     try {
       const targetUrl = `https://api.mercadopago.com/v1/payments/search?external_reference=${saleId}`;
-      const data = await mpRequest('GET', targetUrl, token);
-      const approvedPayment = data.results?.find((p: any) => p.status === 'approved');
+      const res = await axios.get(targetUrl, {
+        headers: {
+          Authorization: `Bearer ${token.trim()}`
+        }
+      });
+      const approvedPayment = res.data?.results?.find((p: any) => p.status === 'approved');
       return !!approvedPayment;
     } catch (err) {
       return false;

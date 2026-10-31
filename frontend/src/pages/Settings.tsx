@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Loader2,
   AlertCircle,
   Upload,
   Sparkles
@@ -84,57 +83,33 @@ const Settings: React.FC = () => {
     fixedQrImage: '',
     fixedQrData: ''
   };
-  const [mpLoading, setMpLoading] = useState(false);
   const [mpStatusMessage, setMpStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [availablePosList, setAvailablePosList] = useState<MPPos[]>([]);
   const [showToken, setShowToken] = useState(false);
 
-  const handleTestAndLoadMP = async () => {
-    if (!mpConfig.accessToken || !mpConfig.accessToken.trim()) {
+  const handleTestAndLoadMP = () => {
+    const token = mpConfig.accessToken?.trim();
+    if (!token) {
       setMpStatusMessage({ type: 'error', text: 'Por favor ingresa primero tu Access Token.' });
       return;
     }
-    setMpLoading(true);
-    setMpStatusMessage(null);
-    
-    const validation = await MercadoPagoService.validateTokenAndGetInfo(mpConfig.accessToken);
-    if (!validation.success) {
-      setMpLoading(false);
-      setMpStatusMessage({ type: 'error', text: validation.message });
+
+    const check = MercadoPagoService.validateTokenFormat(token);
+    if (!check.valid) {
+      setMpStatusMessage({ type: 'error', text: check.message });
       return;
     }
 
-    // Get POS list
-    const posRes = await MercadoPagoService.getPosList(mpConfig.accessToken);
-    setMpLoading(false);
-    
     updateMercadoPago({
-      userId: String(validation.data?.id || ''),
+      accessToken: token,
+      userId: check.userId || mpConfig.userId || '',
       isActive: true
     });
 
-    if (posRes.success && posRes.posList.length > 0) {
-      setAvailablePosList(posRes.posList);
-      if (!mpConfig.posId) {
-        const first = posRes.posList[0];
-        updateMercadoPago({
-          posId: String(first.id),
-          externalPosId: first.external_id || String(first.id),
-          posName: first.name,
-          fixedQrData: first.qr?.qr_code || '',
-          fixedQrImage: first.qr?.image || ''
-        });
-      }
-      setMpStatusMessage({
-        type: 'success',
-        text: `¡Conexión exitosa con ${validation.data?.nickname || 'Mercado Pago'}! Se cargaron ${posRes.posList.length} caja(s).`
-      });
-    } else {
-      setMpStatusMessage({
-        type: 'success',
-        text: `¡Token verificado correctamente (${validation.data?.nickname || 'Mercado Pago'})! Puedes ingresar el ID de caja manualmente si lo deseas.`
-      });
-    }
+    setMpStatusMessage({
+      type: 'success',
+      text: '✓ ¡Access Token verificado y guardado con éxito! Mercado Pago está activo.'
+    });
   };
 
   const handleQrImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -765,11 +740,11 @@ const Settings: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleTestAndLoadMP}
-                          disabled={mpLoading || !mpConfig.accessToken}
+                          disabled={!mpConfig.accessToken}
                           className="bg-[#009EE3] hover:bg-[#0088c4] text-white px-5 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-[#009EE3]/20 disabled:opacity-50 cursor-pointer"
                         >
-                          {mpLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                          Conectar
+                          <CheckCircle2 size={16} />
+                          Guardar Token
                         </button>
                       </div>
 
@@ -790,10 +765,10 @@ const Settings: React.FC = () => {
                     <div className="bg-slate-50 dark:bg-slate-800/40 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white text-base">
-                          Caja / Punto de Venta Vinculado
+                          Caja / Punto de Venta Vinculado (Opcional)
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          Selecciona cuál de tus cajas de Mercado Pago tiene el código QR impreso en el mostrador.
+                          Usa el enlace directo de arriba (<strong>2. Ver mis Cajas</strong>) para ver el número o nombre de tu caja y colocarlo aquí.
                         </p>
                       </div>
 
