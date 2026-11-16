@@ -19,18 +19,38 @@ import { useCashStore } from './store/useCashStore';
 import SubscriptionPay from './components/subscription/SubscriptionPay';
 
 const App: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, fetchUserSession } = useAuthStore();
   const fetchProducts = useInventoryStore((state) => state.fetchProducts);
   const fetchCustomers = useCustomerStore((state) => state.fetchCustomers);
   const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
 
   React.useEffect(() => {
     if (user) {
+      fetchUserSession();
       fetchProducts();
       fetchCustomers();
       fetchActiveSession();
     }
-  }, [user, fetchProducts, fetchCustomers, fetchActiveSession]);
+  }, [user?.id, fetchUserSession, fetchProducts, fetchCustomers, fetchActiveSession]);
+
+  // Periodic and focus-based session & subscription re-validation
+  React.useEffect(() => {
+    if (!user) return;
+
+    const handleFocus = () => {
+      fetchUserSession();
+    };
+
+    const interval = setInterval(() => {
+      fetchUserSession();
+    }, 5 * 60 * 1000);
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [user?.id, fetchUserSession]);
 
   const isEmployee = user?.role === 'EMPLOYEE';
   const isSuperAdmin = user?.email === 'horaciowalterortiz@gmail.com';

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Crown, 
-  Zap, 
-  Search, 
-  DollarSign, 
-  Save, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  Users,
+  Crown,
+  Zap,
+  Search,
+  DollarSign,
+  Save,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
   RefreshCw,
   Building,
   Key,
@@ -71,6 +71,20 @@ const SuperAdmin: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+
+      // Auto-deactivate any expired subscriptions in the database
+      const nowIso = new Date().toISOString();
+      try {
+        await supabase
+          .from('Tenant')
+          .update({ subActive: false })
+          .eq('subActive', true)
+          .not('subExpiresAt', 'is', null)
+          .lte('subExpiresAt', nowIso);
+      } catch (syncErr) {
+        console.error('Error auto-syncing expired tenants in DB:', syncErr);
+      }
+
       // Fetch tenants along with users
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('Tenant')
@@ -120,6 +134,9 @@ const SuperAdmin: React.FC = () => {
               .eq('tenantId', t.id)
           ]);
 
+          const isExpired = t.subExpiresAt ? new Date(t.subExpiresAt) <= new Date() : false;
+          const effectiveSubActive = Boolean(t.subActive && !isExpired);
+
           return {
             id: t.id,
             name: t.name,
@@ -127,7 +144,7 @@ const SuperAdmin: React.FC = () => {
             phone: t.phone,
             address: t.address,
             plan: t.plan,
-            subActive: t.subActive,
+            subActive: effectiveSubActive,
             subExpiresAt: t.subExpiresAt,
             createdAt: t.createdAt,
             salesCount: salesCount || 0,
@@ -176,11 +193,11 @@ const SuperAdmin: React.FC = () => {
   const savePrices = async () => {
     try {
       setSavingPrices(true);
-      
+
       const { error: errStandard } = await supabase
         .from('SystemConfig')
         .upsert({ key: 'price_standard', value: String(prices.price_standard) });
-        
+
       if (errStandard) throw errStandard;
 
       const { error: errPro } = await supabase
@@ -202,17 +219,17 @@ const SuperAdmin: React.FC = () => {
   const saveLinks = async () => {
     try {
       setSavingLinks(true);
-      
+
       const { error: errScanner } = await supabase
         .from('SystemConfig')
         .upsert({ key: 'link_scanner', value: links.link_scanner });
-        
+
       if (errScanner) throw errScanner;
 
       const { error: errPrinter } = await supabase
         .from('SystemConfig')
         .upsert({ key: 'link_printer', value: links.link_printer });
-        
+
       if (errPrinter) throw errPrinter;
 
       const { error: errDisplay } = await supabase
@@ -264,7 +281,7 @@ const SuperAdmin: React.FC = () => {
       }
 
       let newStatus = subActive !== undefined ? subActive : !tenant.subActive;
-      
+
       // Calculate new expiry — supports positive (agregar) and negative (descontar) days
       let newExpiresAt: string | null = tenant.subExpiresAt;
       if (days !== undefined) {
@@ -305,16 +322,16 @@ const SuperAdmin: React.FC = () => {
         text: `Comercio ${updatedTenant.name} ${updatedTenant.subActive ? `activado${daysMsg}` : 'desactivado'} exitosamente.`
       });
       setTimeout(() => setFeedbackMessage(null), 5000);
-      
+
       // Update local state with returned tenant data and refresh the dashboard.
-      setTenants(prev => prev.map(t => 
-        t.id === tenantId 
-          ? { 
-              ...t, 
-              subActive: updatedTenant.subActive,
-              subExpiresAt: updatedTenant.subExpiresAt || t.subExpiresAt,
-              plan: updatedTenant.plan || t.plan
-            } 
+      setTenants(prev => prev.map(t =>
+        t.id === tenantId
+          ? {
+            ...t,
+            subActive: updatedTenant.subActive,
+            subExpiresAt: updatedTenant.subExpiresAt || t.subExpiresAt,
+            plan: updatedTenant.plan || t.plan
+          }
           : t
       ));
       await fetchData();
@@ -333,14 +350,14 @@ const SuperAdmin: React.FC = () => {
   // Filter logic
   const filteredTenants = tenants.filter(t => {
     const query = searchTerm.toLowerCase();
-    const matchesSearch = 
-      t.name.toLowerCase().includes(query) || 
+    const matchesSearch =
+      t.name.toLowerCase().includes(query) ||
       (t.email && t.email.toLowerCase().includes(query)) ||
       (t.phone && t.phone.toLowerCase().includes(query)) ||
       t.users.some(u => u.email.toLowerCase().includes(query) || u.name.toLowerCase().includes(query));
 
     const matchesPlan = planFilter === 'ALL' || t.plan === planFilter;
-    
+
     let matchesStatus = true;
     if (statusFilter === 'ACTIVE') {
       matchesStatus = t.subActive;
@@ -365,7 +382,7 @@ const SuperAdmin: React.FC = () => {
           <h1 className="text-4xl font-black text-slate-900 dark:text-white mt-2">Panel KIOSNET</h1>
           <p className="text-slate-500 font-medium">Control global de usuarios, planes y facturación del sistema.</p>
         </div>
-        <button 
+        <button
           onClick={fetchData}
           className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-95 shadow-sm"
           title="Recargar datos"
@@ -462,11 +479,10 @@ const SuperAdmin: React.FC = () => {
       )}
 
       {feedbackMessage && (
-        <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
-          feedbackMessage.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400' 
+        <div className={`p-4 rounded-2xl border flex items-center gap-3 ${feedbackMessage.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
             : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400'
-        }`}>
+          }`}>
           {feedbackMessage.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
           <span className="font-bold text-sm">{feedbackMessage.text}</span>
         </div>
@@ -519,8 +535,8 @@ const SuperAdmin: React.FC = () => {
             <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Precio Plan Estándar ($ ARS)</label>
             <div className="relative">
               <span className="absolute left-4 top-4 font-black text-slate-400 text-lg">$</span>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={prices.price_standard.toLocaleString()}
                 onChange={(e) => handlePriceChange('standard', e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-8 pr-4 font-black text-slate-900 dark:text-white text-lg focus:outline-none focus:border-blue-500 transition-colors"
@@ -533,8 +549,8 @@ const SuperAdmin: React.FC = () => {
             <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Precio Plan Pro ($ ARS)</label>
             <div className="relative">
               <span className="absolute left-4 top-4 font-black text-slate-400 text-lg">$</span>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={prices.price_pro.toLocaleString()}
                 onChange={(e) => handlePriceChange('pro', e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 pl-8 pr-4 font-black text-slate-900 dark:text-white text-lg focus:outline-none focus:border-blue-500 transition-colors"
@@ -545,7 +561,7 @@ const SuperAdmin: React.FC = () => {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
-          <button 
+          <button
             onClick={savePrices}
             disabled={savingPrices}
             className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
@@ -567,8 +583,8 @@ const SuperAdmin: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
             <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Lector de Códigos</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={links.link_scanner}
               onChange={(e) => setLinks(prev => ({ ...prev, link_scanner: e.target.value }))}
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -578,8 +594,8 @@ const SuperAdmin: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Ticketera Térmica</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={links.link_printer}
               onChange={(e) => setLinks(prev => ({ ...prev, link_printer: e.target.value }))}
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -589,8 +605,8 @@ const SuperAdmin: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-xs font-black uppercase text-slate-400 tracking-wider">Enlace Pantalla Cliente (Tablet/Soporte)</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={links.link_display}
               onChange={(e) => setLinks(prev => ({ ...prev, link_display: e.target.value }))}
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -612,7 +628,7 @@ const SuperAdmin: React.FC = () => {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
-          <button 
+          <button
             onClick={saveLinks}
             disabled={savingLinks}
             className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-2xl flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
@@ -631,14 +647,14 @@ const SuperAdmin: React.FC = () => {
             </h2>
             <p className="text-sm text-slate-500 font-medium mt-1">Lista en tiempo real con estadísticas y detalles de suscripción.</p>
           </div>
-          
+
           {/* Filters Bar */}
           <div className="flex flex-wrap gap-3 items-center">
             {/* Search Input */}
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Buscar comercio o email..." 
+              <input
+                type="text"
+                placeholder="Buscar comercio o email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-colors w-64"
@@ -736,7 +752,7 @@ const SuperAdmin: React.FC = () => {
                                       baseDate = new Date(t.subExpiresAt);
                                     }
                                     baseDate.setMonth(baseDate.getMonth() + t.paymentNotification!.months);
-                                    
+
                                     const { error: appErr } = await supabase
                                       .from('Tenant')
                                       .update({
@@ -816,18 +832,32 @@ const SuperAdmin: React.FC = () => {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col">
-                        {t.subActive ? (
-                          <span className="flex items-center gap-1 text-emerald-500 font-black text-xs">
-                            <CheckCircle size={14} /> ACTIVA
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-red-500 font-black text-xs">
-                            <XCircle size={14} /> BLOQUEADA
-                          </span>
-                        )}
+                        {(() => {
+                          const isExpired = t.subExpiresAt ? new Date(t.subExpiresAt) <= new Date() : false;
+                          if (isExpired) {
+                            return (
+                              <span className="flex items-center gap-1 text-amber-500 font-black text-xs">
+                                <AlertTriangle size={14} /> VENCIDA
+                              </span>
+                            );
+                          }
+                          if (t.subActive) {
+                            return (
+                              <span className="flex items-center gap-1 text-emerald-500 font-black text-xs">
+                                <CheckCircle size={14} /> ACTIVA
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="flex items-center gap-1 text-red-500 font-black text-xs">
+                              <XCircle size={14} /> BLOQUEADA
+                            </span>
+                          );
+                        })()}
                         {t.subExpiresAt && (
-                          <span className="text-[10px] text-slate-400 mt-1 font-bold">
-                            Vence: {new Date(t.subExpiresAt).toLocaleDateString()}
+                          <span className={`text-[10px] mt-1 font-bold ${new Date(t.subExpiresAt) <= new Date() ? 'text-red-500 font-black' : 'text-slate-400'
+                            }`}>
+                            {new Date(t.subExpiresAt) <= new Date() ? 'Venció:' : 'Vence:'} {new Date(t.subExpiresAt).toLocaleDateString('es-AR')}
                           </span>
                         )}
                       </div>
@@ -854,7 +884,7 @@ const SuperAdmin: React.FC = () => {
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20"
                           >
                             <Power size={11} />
-                            {togglingTenantId === t.id ? 'Procesando...' : 'Activar'}
+                            {togglingTenantId === t.id ? 'Procesando...' : (t.subExpiresAt && new Date(t.subExpiresAt) <= new Date() ? 'Reactivar' : 'Activar')}
                           </button>
                         ) : (
                           <>
@@ -901,11 +931,10 @@ const SuperAdmin: React.FC = () => {
           <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-300">
               {/* Modal Header */}
-              <div className={`p-6 text-white flex justify-between items-start ${
-                isSubtracting
+              <div className={`p-6 text-white flex justify-between items-start ${isSubtracting
                   ? 'bg-gradient-to-r from-orange-600 to-red-600'
                   : 'bg-gradient-to-r from-emerald-600 to-teal-600'
-              }`}>
+                }`}>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-white/80 mb-1">
                     {isSubtracting ? 'Corregir / Descontar Días' : 'Activar / Extender Suscripción'}
@@ -929,22 +958,20 @@ const SuperAdmin: React.FC = () => {
                   <div className="flex gap-3">
                     <button
                       onClick={() => setActivatePlan('STANDARD')}
-                      className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${
-                        activatePlan === 'STANDARD'
+                      className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${activatePlan === 'STANDARD'
                           ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
                           : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
-                      }`}
+                        }`}
                     >
                       <Zap size={14} className="inline mr-1.5" />
                       Estándar
                     </button>
                     <button
                       onClick={() => setActivatePlan('PRO')}
-                      className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${
-                        activatePlan === 'PRO'
+                      className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${activatePlan === 'PRO'
                           ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/20'
                           : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400'
-                      }`}
+                        }`}
                     >
                       <Crown size={14} className="inline mr-1.5" />
                       Pro
@@ -965,11 +992,10 @@ const SuperAdmin: React.FC = () => {
                       <button
                         key={`+${d}`}
                         onClick={() => setActivateDays(d)}
-                        className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${
-                          activateDays === d
+                        className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${activateDays === d
                             ? 'bg-emerald-600 border-emerald-500 text-white'
                             : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-400'
-                        }`}
+                          }`}
                       >
                         +{d}d
                       </button>
@@ -983,11 +1009,10 @@ const SuperAdmin: React.FC = () => {
                       <button
                         key={d}
                         onClick={() => setActivateDays(d)}
-                        className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${
-                          activateDays === d
+                        className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${activateDays === d
                             ? 'bg-red-600 border-red-500 text-white'
                             : 'bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900/40 text-red-400 hover:border-red-400'
-                        }`}
+                          }`}
                       >
                         {d}d
                       </button>
@@ -1033,11 +1058,10 @@ const SuperAdmin: React.FC = () => {
                       activatePlan
                     )}
                     disabled={togglingTenantId === activateModal.tenantId}
-                    className={`flex-1 ${
-                      isSubtracting
+                    className={`flex-1 ${isSubtracting
                         ? 'bg-gradient-to-r from-orange-600 to-red-600 shadow-red-600/20'
                         : 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-600/20'
-                    } hover:opacity-90 text-white py-3.5 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
+                      } hover:opacity-90 text-white py-3.5 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                   >
                     {togglingTenantId === activateModal.tenantId ? (
                       <RefreshCw size={16} className="animate-spin" />

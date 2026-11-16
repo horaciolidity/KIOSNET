@@ -88,6 +88,21 @@ export const useAuthStore = create<AuthState>()(
             .select('*', { count: 'exact', head: true })
             .eq('tenantId', dbUser.tenantId);
 
+          const isExpired = tenant?.subExpiresAt ? new Date(tenant.subExpiresAt) <= new Date() : false;
+          const isSubActive = Boolean(tenant?.subActive && !isExpired);
+
+          // If marked active in DB but the expiration date has passed, auto-sync DB
+          if (tenant?.subActive && isExpired) {
+            try {
+              await supabase
+                .from('Tenant')
+                .update({ subActive: false })
+                .eq('id', dbUser.tenantId);
+            } catch (syncErr) {
+              console.error('Error auto-syncing expired subscription in DB:', syncErr);
+            }
+          }
+
           set({
             user: {
               id: dbUser.id,
@@ -96,7 +111,7 @@ export const useAuthStore = create<AuthState>()(
               role: dbUser.role as 'ADMIN' | 'EMPLOYEE',
               tenantId: dbUser.tenantId,
               plan: tenant?.plan || 'FREE',
-              subActive: (tenant?.subActive && (tenant?.subExpiresAt ? new Date(tenant.subExpiresAt) > new Date() : true)) || false,
+              subActive: isSubActive,
               subExpiresAt: tenant?.subExpiresAt || null,
               salesCount: count || 0,
               onboardingCompleted: dbUser.onboardingCompleted || false

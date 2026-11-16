@@ -87,14 +87,16 @@ const Dashboard: React.FC = () => {
   const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
   
   // Real Database Subscription Details
-  const activePlan = user?.subActive ? user?.plan : 'FREE';
+  const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) <= new Date() : false;
+  const hasActiveSub = Boolean(user?.subActive && !isPlanExpired);
+  const activePlan = hasActiveSub ? user?.plan : 'FREE';
   const salesUsed = user?.salesCount ?? 0;
   const salesLimit = 50;
   const salesPercentage = Math.min((salesUsed / salesLimit) * 100, 100);
 
   // Calculate real remaining license days
-  const daysRemaining = user?.subExpiresAt 
-    ? Math.max(1, Math.round((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) 
+  const daysRemaining = (user?.subExpiresAt && !isPlanExpired)
+    ? Math.max(0, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) 
     : 0;
 
   const handleSelectPlan = (plan: 'STANDARD' | 'PRO') => {
@@ -120,6 +122,29 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Expired Plan Banner */}
+      {isPlanExpired && (
+        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 rounded-[32px] p-6 text-white shadow-xl shadow-red-500/10 flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in duration-300">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-2xl shrink-0">
+              <AlertTriangle size={28} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black">Tu suscripción ha vencido</h3>
+              <p className="text-white/80 text-sm">
+                Venció el {user?.subExpiresAt ? new Date(user.subExpiresAt).toLocaleDateString('es-AR') : ''}. Las ventas en el POS están bloqueadas hasta renovar el plan.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/billing')}
+            className="bg-white text-red-600 px-6 py-3 rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-slate-100 transition-all shadow-md shrink-0 cursor-pointer"
+          >
+            Renovar Ahora
+          </button>
+        </div>
+      )}
 
       {/* Subscription Progress (Only for Free) */}
       {activePlan === 'FREE' && (

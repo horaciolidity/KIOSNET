@@ -62,6 +62,17 @@ const Login: React.FC = () => {
         .from('Sale')
         .select('*', { count: 'exact', head: true })
         .eq('tenantId', dbUser.tenantId);
+      const isExpired = tenant?.subExpiresAt ? new Date(tenant.subExpiresAt) <= new Date() : false;
+      const isSubActive = Boolean(tenant?.subActive && !isExpired);
+
+      if (tenant?.subActive && isExpired) {
+        supabase
+          .from('Tenant')
+          .update({ subActive: false })
+          .eq('id', dbUser.tenantId)
+          .then();
+      }
+
       const userObj = {
         id: dbUser.id,
         email: dbUser.email,
@@ -69,7 +80,7 @@ const Login: React.FC = () => {
         role: dbUser.role as 'ADMIN' | 'EMPLOYEE',
         tenantId: dbUser.tenantId,
         plan: tenant?.plan || 'FREE',
-        subActive: (tenant?.subActive && (tenant?.subExpiresAt ? new Date(tenant.subExpiresAt) > new Date() : true)) || false,
+        subActive: isSubActive,
         subExpiresAt: tenant?.subExpiresAt || null,
         salesCount: count || 0,
         onboardingCompleted: dbUser.onboardingCompleted || false

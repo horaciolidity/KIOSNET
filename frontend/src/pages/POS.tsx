@@ -69,13 +69,14 @@ const POS: React.FC = () => {
     }
   }, [scaleConfig]);
   
-  const activePlan = user?.subActive ? user?.plan : 'FREE';
+  const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) <= new Date() : false;
+  const hasActiveSub = Boolean(user?.subActive && !isPlanExpired);
+  const isFreeTrialActive = user?.plan === 'FREE' && !isPlanExpired && ((user?.salesCount ?? 0) < 50);
+  const salesBlocked = !hasActiveSub && !isFreeTrialActive;
+
+  const activePlan = hasActiveSub ? user?.plan : 'FREE';
   const isPro = activePlan === 'PRO';
   const isStandardOrPro = activePlan === 'STANDARD' || activePlan === 'PRO';
-
-  const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) < new Date() : false;
-  const isFreeTrialActive = (user?.salesCount ?? 0) < 50;
-  const salesBlocked = isFreeTrialActive ? false : (user?.plan === 'FREE' ? true : isPlanExpired);
 
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
@@ -242,16 +243,37 @@ const POS: React.FC = () => {
     }
 
     try {
-      const { count: salesCount } = await supabase
-        .from('Sale')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenantId', user.tenantId);
+      const [{ count: salesCount }, { data: liveTenant }] = await Promise.all([
+        supabase
+          .from('Sale')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenantId', user.tenantId),
+        supabase
+          .from('Tenant')
+          .select('plan, subActive, subExpiresAt')
+          .eq('id', user.tenantId)
+          .single()
+      ]);
 
-      const liveFreeTrialActive = salesCount !== null && salesCount < 50;
-      const isLiveBlocked = liveFreeTrialActive ? false : (user?.plan === 'FREE' ? true : isPlanExpired);
+      const effectivePlan = liveTenant?.plan || user?.plan || 'FREE';
+      const liveExpiresAt = liveTenant?.subExpiresAt || user?.subExpiresAt;
+      const isLiveExpired = liveExpiresAt ? new Date(liveExpiresAt) <= new Date() : false;
+      const hasLiveActiveSub = Boolean(liveTenant?.subActive && !isLiveExpired);
+      const isLiveTrialActive = effectivePlan === 'FREE' && !isLiveExpired && ((salesCount ?? 0) < 50);
+      const isLiveBlocked = !hasLiveActiveSub && !isLiveTrialActive;
+
+      // Auto-sync database if it expired
+      if (liveTenant?.subActive && isLiveExpired) {
+        supabase
+          .from('Tenant')
+          .update({ subActive: false })
+          .eq('id', user.tenantId)
+          .then();
+        useAuthStore.getState().setSubscriptionActive(false);
+      }
 
       if (isLiveBlocked) {
-        alert('Tu período de facturación ha vencido o has alcanzado el límite del plan gratuito. Por favor, activa o renueva tu suscripción en la sección de pagos para continuar.');
+        alert('Tu período de facturación ha vencido o has alcanzado el límite de ventas permitidas. Por favor, activa o renueva tu suscripción para continuar.');
         return;
       }
 
@@ -451,6 +473,11 @@ const POS: React.FC = () => {
 
   const handleFinishSale = async () => {
     if (isSubmitting) return;
+
+    if (salesBlocked) {
+      alert('Tu suscripción ha vencido o el período de prueba ha finalizado. Por favor, activa o renueva tu plan en Facturación para continuar.');
+      return;
+    }
 
     if (paymentMethod === 'CUENTA_CORRIENTE' && !selectedCustomerId) {
       alert('Debes seleccionar un cliente para cobrar con Cuenta Corriente.');
