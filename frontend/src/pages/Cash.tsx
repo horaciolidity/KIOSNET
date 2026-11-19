@@ -42,11 +42,12 @@ const getMethod = (m: string) => METHOD_META[m] ?? METHOD_META['NINGUNO'];
 const Cash: React.FC = () => {
   const { user } = useAuthStore();
   const { security } = useSettingsStore();
-  const { session, openBox, closeBox, addTransaction, pastRegisters, fetchPastRegisters } = useCashStore();
+  const { session, openBox, closeBox, addTransaction, pastRegisters, fetchPastRegisters, fetchHistory } = useCashStore();
 
   React.useEffect(() => {
     useCashStore.getState().fetchActiveSession();
-  }, []);
+    fetchHistory();
+  }, [fetchHistory]);
 
   const isEmployee = user?.role === 'EMPLOYEE' && (security?.employeeBlockCash ?? true);
   const [openingAmount, setOpeningAmount] = useState<string>('');
@@ -214,11 +215,11 @@ const Cash: React.FC = () => {
               subtext="Saldo físico en cajón"
             />
             <StatCard 
-              title="Ventas Totales" 
+              title="Ventas del Turno" 
               amount={totalSales} 
               icon={<TrendingUp size={20}/>} 
               color="emerald"
-              subtext={`${saleCount} venta${saleCount !== 1 ? 's' : ''} realizadas`}
+              subtext={`${saleCount} venta${saleCount !== 1 ? 's' : ''} en este turno`}
             />
             {!isEmployee && (
               <StatCard 

@@ -15,7 +15,7 @@ import Layout from './components/layout/Layout';
 import { useAuthStore } from './store/useAuthStore';
 import { useInventoryStore } from './store/useInventoryStore';
 import { useCustomerStore } from './store/useCustomerStore';
-import { useCashStore } from './store/useCashStore';
+import { useCashStore, subscribeToCashRealtime } from './store/useCashStore';
 import SubscriptionPay from './components/subscription/SubscriptionPay';
 
 const App: React.FC = () => {
@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const fetchProducts = useInventoryStore((state) => state.fetchProducts);
   const fetchCustomers = useCustomerStore((state) => state.fetchCustomers);
   const fetchActiveSession = useCashStore((state) => state.fetchActiveSession);
+  const fetchHistory = useCashStore((state) => state.fetchHistory);
 
   React.useEffect(() => {
     if (user) {
@@ -30,8 +31,19 @@ const App: React.FC = () => {
       fetchProducts();
       fetchCustomers();
       fetchActiveSession();
+      fetchHistory();
     }
-  }, [user?.id, fetchUserSession, fetchProducts, fetchCustomers, fetchActiveSession]);
+  }, [user?.id, fetchUserSession, fetchProducts, fetchCustomers, fetchActiveSession, fetchHistory]);
+
+  // Realtime subscription for Cash and Sales across all connected devices/tabs
+  React.useEffect(() => {
+    if (user?.tenantId) {
+      const unsubscribe = subscribeToCashRealtime(user.tenantId);
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [user?.tenantId]);
 
   // Periodic and focus-based session & subscription re-validation
   React.useEffect(() => {

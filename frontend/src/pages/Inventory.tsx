@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
-  Edit3, 
-  Trash2, 
-  X, 
-  Save, 
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Package,
+  Plus,
+  Search,
+  Filter,
+  Download,
+  Edit3,
+  Trash2,
+  X,
+  Save,
   AlertCircle,
   ScanBarcode,
   Loader2
@@ -17,6 +17,7 @@ import { useInventoryStore } from '../store/useInventoryStore';
 import type { Product, ProductCategory, ProductUnit } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import AudioHelper from '../utils/audioHelper';
 
 const CATEGORIES: ProductCategory[] = ['Lacteos', 'Panaderia', 'Bebidas', 'Cigarrillos', 'Fiambreria', 'Otros'];
 const UNITS: ProductUnit[] = ['UNIDAD', 'KILO', 'LITRO'];
@@ -34,6 +35,12 @@ const Inventory: React.FC = () => {
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
 
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const costPriceInputRef = useRef<HTMLInputElement>(null);
+  const priceInputRef = useRef<HTMLInputElement>(null);
+  const stockInputRef = useRef<HTMLInputElement>(null);
+
   // Form State (Using strings for numbers to allow empty inputs)
   const [formData, setFormData] = useState({
     name: '',
@@ -49,8 +56,20 @@ const Inventory: React.FC = () => {
     wholesaleMinQty: '' as string | number,
   });
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const duplicateBarcodeProduct = formData.barcode.trim()
+    ? products.find(p => p.barcode === formData.barcode.trim() && p.id !== editingProduct?.id)
+    : null;
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 60);
+    }
+  }, [isModalOpen]);
+
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.barcode.includes(searchTerm)
   );
 
@@ -90,9 +109,25 @@ const Inventory: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      // Prevent accidental submission when Enter is pressed inside inputs or selects
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
+        e.preventDefault();
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (duplicateBarcodeProduct) {
+      alert(`Ya tienes un producto registrado con este código de barras ("${duplicateBarcodeProduct.name}"). Modifica el código antes de guardar.`);
+      barcodeInputRef.current?.focus();
+      return;
+    }
+
     const finalData = {
       ...formData,
       price: Number(formData.price) || 0,
@@ -113,10 +148,10 @@ const Inventory: React.FC = () => {
 
   const exportToCSV = () => {
     const headers = 'Nombre,Código,Categoría,Unidad,Costo,Precio,Stock,Mínimo,Precio Mayorista,Mínimo Mayorista\n';
-    const rows = products.map(p => 
+    const rows = products.map(p =>
       `"${(p.name || '').replace(/"/g, '""')}",${p.barcode || ''},${p.category || ''},${p.unit || ''},${p.costPrice || 0},${p.price || 0},${p.stock || 0},${p.minStock || 0},${p.wholesalePrice != null ? p.wholesalePrice : ''},${p.wholesaleMinQty != null ? p.wholesaleMinQty : ''}`
     ).join('\n');
-    
+
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -125,10 +160,10 @@ const Inventory: React.FC = () => {
   };
 
   const exportToTXT = () => {
-    const content = products.map(p => 
+    const content = products.map(p =>
       `PRODUCTO: ${p.name} | CÓDIGO: ${p.barcode || 'S/C'} | STOCK: ${p.stock} | PRECIO: $${p.price}${p.wholesalePrice != null ? ` | P. MAYORISTA: $${p.wholesalePrice} (min. ${p.wholesaleMinQty || 1} u.)` : ''}`
     ).join('\n');
-    
+
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -186,11 +221,11 @@ const Inventory: React.FC = () => {
         return result;
       };
 
-      const normalizeStr = (str: string) => 
+      const normalizeStr = (str: string) =>
         str.toLowerCase()
-           .normalize('NFD')
-           .replace(/[\u0300-\u036f]/g, '')
-           .replace(/[^a-z0-9]/g, '');
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, '');
 
       const parseNumber = (val: any): number | null => {
         if (val === undefined || val === null) return null;
@@ -344,7 +379,7 @@ const Inventory: React.FC = () => {
           updatedCount++;
 
           // Mantener sincronizado el array local de productos para siguientes líneas del mismo archivo
-          currentProducts = currentProducts.map(p => 
+          currentProducts = currentProducts.map(p =>
             p.id === existingProduct!.id ? { ...p, ...updateData } : p
           );
         } else {
@@ -401,20 +436,20 @@ const Inventory: React.FC = () => {
               <input type="file" className="hidden" accept=".csv,.txt" onChange={handleImport} disabled={isImporting} />
             </label>
             <div className="flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-              <button 
+              <button
                 onClick={exportToCSV}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all border-r border-slate-200 dark:border-slate-800"
               >
                 <Download size={16} /> Excel
               </button>
-              <button 
+              <button
                 onClick={exportToTXT}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
               >
                 TXT
               </button>
             </div>
-            <button 
+            <button
               id="tour-inv-add"
               onClick={openAddModal}
               className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
@@ -430,9 +465,9 @@ const Inventory: React.FC = () => {
         <div id="tour-inv-search" className="lg:col-span-3 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-3 w-5 h-5 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre o código de barras..." 
+            <input
+              type="text"
+              placeholder="Buscar por nombre o código de barras..."
               className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-3 px-12 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -442,7 +477,7 @@ const Inventory: React.FC = () => {
             <Filter size={18} /> Filtros
           </button>
         </div>
-        
+
         {lowStockCount > 0 ? (
           <div className="bg-orange-50 dark:bg-orange-500/10 p-4 rounded-3xl border border-orange-100 dark:border-orange-500/20 flex items-center gap-4 animate-pulse">
             <div className="p-3 bg-orange-500 rounded-2xl text-white shadow-lg shadow-orange-500/40">
@@ -484,11 +519,10 @@ const Inventory: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredProducts.map((product) => (
-                <tr 
-                  key={product.id} 
-                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all group relative ${
-                    product.stock <= product.minStock ? 'bg-orange-50/30 dark:bg-orange-500/5' : ''
-                  }`}
+                <tr
+                  key={product.id}
+                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all group relative ${product.stock <= product.minStock ? 'bg-orange-50/30 dark:bg-orange-500/5' : ''
+                    }`}
                 >
                   <td className="px-8 py-5">
                     {product.stock <= product.minStock && (
@@ -534,14 +568,14 @@ const Inventory: React.FC = () => {
                   {!isEmployee && (
                     <td className="px-8 py-5 text-right">
                       <div className="flex justify-end gap-2">
-                        <button 
+                        <button
                           onClick={() => openEditModal(product)}
                           className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-2xl transition-all"
                         >
                           <Edit3 size={18} />
                         </button>
-                        <button 
-                          onClick={() => { if(confirm('¿Seguro?')) deleteProduct(product.id) }}
+                        <button
+                          onClick={() => { if (confirm('¿Seguro?')) deleteProduct(product.id) }}
                           className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-2xl transition-all"
                         >
                           <Trash2 size={18} />
@@ -572,15 +606,22 @@ const Inventory: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="p-5 space-y-5 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormGroup label="Nombre del Producto" colSpan="md:col-span-2">
-                  <input 
-                    type="text" 
-                    required 
-                    className="form-input" 
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    required
+                    className="form-input"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        barcodeInputRef.current?.focus();
+                      }
+                    }}
                     placeholder="Ej: Leche Entera 1L"
                   />
                 </FormGroup>
@@ -588,21 +629,34 @@ const Inventory: React.FC = () => {
                 <FormGroup label="Código de Barras">
                   <div className="relative">
                     <ScanBarcode className="absolute left-4 top-3.5 text-slate-400 w-5 h-5" />
-                    <input 
-                      type="text" 
-                      className="form-input pl-12" 
+                    <input
+                      ref={barcodeInputRef}
+                      type="text"
+                      className={`form-input pl-12 ${duplicateBarcodeProduct ? 'border-amber-400 focus:border-amber-500' : ''}`}
                       value={formData.barcode}
-                      onChange={(e) => setFormData({...formData, barcode: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          AudioHelper.playScanBeep();
+                          costPriceInputRef.current?.focus();
+                        }
+                      }}
                       placeholder="Escanear o escribir..."
                     />
                   </div>
+                  {duplicateBarcodeProduct && (
+                    <p className="text-xs text-amber-500 font-bold flex items-center gap-1 mt-1">
+                      <AlertCircle size={13} /> Ya existe "{duplicateBarcodeProduct.name}" con este código
+                    </p>
+                  )}
                 </FormGroup>
 
                 <FormGroup label="Categoría">
-                  <select 
+                  <select
                     className="form-input appearance-none"
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value as ProductCategory})}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as ProductCategory })}
                   >
                     {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
@@ -611,12 +665,19 @@ const Inventory: React.FC = () => {
                 <FormGroup label="Precio de Costo">
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-slate-400 font-bold">$</span>
-                    <input 
-                      type="number" 
-                      className="form-input pl-8" 
+                    <input
+                      ref={costPriceInputRef}
+                      type="number"
+                      className="form-input pl-8"
                       value={formData.costPrice}
                       placeholder="0"
-                      onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          priceInputRef.current?.focus();
+                        }
+                      }}
                     />
                   </div>
                 </FormGroup>
@@ -624,12 +685,19 @@ const Inventory: React.FC = () => {
                 <FormGroup label="Precio de Venta">
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-emerald-500 font-bold">$</span>
-                    <input 
-                      type="number" 
-                      className="form-input pl-8 border-emerald-500/20 focus:ring-emerald-500/10" 
+                    <input
+                      ref={priceInputRef}
+                      type="number"
+                      className="form-input pl-8 border-emerald-500/20 focus:ring-emerald-500/10"
                       value={formData.price}
                       placeholder="0"
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          stockInputRef.current?.focus();
+                        }
+                      }}
                     />
                   </div>
                 </FormGroup>
@@ -637,43 +705,54 @@ const Inventory: React.FC = () => {
                 <FormGroup label="Precio Mayorista (Opcional)">
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-blue-500 font-bold">$</span>
-                    <input 
-                      type="number" 
-                      className="form-input pl-8 border-blue-500/20 focus:ring-blue-500/10" 
+                    <input
+                      type="number"
+                      className="form-input pl-8 border-blue-500/20 focus:ring-blue-500/10"
                       value={formData.wholesalePrice}
                       placeholder="Sin precio mayorista"
-                      onChange={(e) => setFormData({...formData, wholesalePrice: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
                     />
                   </div>
                 </FormGroup>
 
                 <FormGroup label="Cant. Mínima Mayorista">
-                  <input 
-                    type="number" 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    className="form-input"
                     value={formData.wholesaleMinQty}
                     placeholder="Mínimo de unidades (Ej: 5)"
-                    onChange={(e) => setFormData({...formData, wholesaleMinQty: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, wholesaleMinQty: e.target.value })}
                   />
                 </FormGroup>
 
                 <FormGroup label="Stock Actual">
-                  <input 
-                    type="number" 
-                    className="form-input" 
+                  <input
+                    ref={stockInputRef}
+                    type="number"
+                    className="form-input"
                     value={formData.stock}
                     placeholder="0"
-                    onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </FormGroup>
 
                 <FormGroup label="Stock Mínimo">
-                  <input 
-                    type="number" 
-                    className="form-input" 
+                  <input
+                    type="number"
+                    className="form-input"
                     value={formData.minStock}
                     placeholder="0"
-                    onChange={(e) => setFormData({...formData, minStock: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
+                    }}
                   />
                 </FormGroup>
 
@@ -683,7 +762,7 @@ const Inventory: React.FC = () => {
                       <button
                         key={unit}
                         type="button"
-                        onClick={() => setFormData({...formData, unit})}
+                        onClick={() => setFormData({ ...formData, unit })}
                         className={`flex-1 py-3 rounded-2xl text-xs font-black transition-all border ${formData.unit === unit ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-transparent hover:border-slate-300'}`}
                       >
                         {unit}
@@ -694,14 +773,14 @@ const Inventory: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="px-6 py-2.5 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="px-8 py-2.5 bg-blue-600 text-white rounded-2xl font-black flex items-center gap-2 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95"
                 >

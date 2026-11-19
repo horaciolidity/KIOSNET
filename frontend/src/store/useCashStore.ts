@@ -11,6 +11,7 @@ export interface CashTransaction {
   description: string;
   timestamp: string;
   details?: any;
+  registerId?: string | null;
 }
 
 export interface CashSession {
@@ -59,12 +60,26 @@ export function mapDbToFrontendType(type: 'IN' | 'OUT', description: string, pay
 } {
   const desc = description.toLowerCase();
 
-  // Determine transaction type
+  // Determine transaction type safely based on database flow (IN vs OUT) first!
   let txType: CashTransaction['type'];
-  if (desc.includes('venta')) txType = 'VENTA';
-  else if (desc.includes('deuda') || desc.includes('pago')) txType = 'PAGO_DEUDA';
-  else if (desc.includes('apertura') || desc.includes('cierre')) txType = 'SISTEMA';
-  else txType = type === 'IN' ? 'INGRESO' : 'EGRESO';
+  if (type === 'OUT') {
+    if (desc.includes('cierre')) {
+      txType = 'SISTEMA';
+    } else {
+      txType = 'EGRESO';
+    }
+  } else {
+    // IN
+    if (desc.includes('apertura')) {
+      txType = 'SISTEMA';
+    } else if (desc.includes('venta')) {
+      txType = 'VENTA';
+    } else if (desc.includes('deuda') || desc.includes('cobro')) {
+      txType = 'PAGO_DEUDA';
+    } else {
+      txType = 'INGRESO';
+    }
+  }
 
   // Determine payment method from stored paymentMethod field
   let method: CashTransaction['method'] = 'EFECTIVO';
@@ -127,7 +142,6 @@ export const useCashStore = create<CashState>((set, get) => ({
       const { data: rows, error } = await supabase
         .from('CashRegister')
         .select('*, movements:CashMovement(*)')
-        .eq('userId', user.id)
         .eq('status', 'OPEN')
         .eq('tenantId', user.tenantId)
         .order('openedAt', { ascending: false })
@@ -142,6 +156,7 @@ export const useCashStore = create<CashState>((set, get) => ({
           const { txType, method } = mapDbToFrontendType(m.type, m.description, m.paymentMethod);
           return {
             id: m.id,
+            registerId: m.registerId || reg.id,
             type: txType,
             amount: m.amount,
             method,
@@ -198,28 +213,6 @@ export const useCashStore = create<CashState>((set, get) => ({
 
     set({ loading: true });
     try {
-      // Clean up movements older than 30 days for this tenant securely
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      try {
-        const { data: registers } = await supabase
-          .from('CashRegister')
-          .select('id')
-          .eq('tenantId', user.tenantId);
-
-        const registerIds = (registers || []).map(r => r.id);
-        
-        if (registerIds.length > 0) {
-          await supabase
-            .from('CashMovement')
-            .delete()
-            .in('registerId', registerIds)
-            .lt('createdAt', thirtyDaysAgo.toISOString());
-        }
-      } catch (err) {
-        console.error('Error cleaning up old cash movements:', err);
-      }
-
       const { data: movements, error } = await supabase
         .from('CashMovement')
         .select(`
@@ -231,9 +224,9 @@ export const useCashStore = create<CashState>((set, get) => ({
           description,
           createdAt,
           details,
-          register:CashRegister!inner(tenantId)
+          registerId
         `)
-        .eq('CashRegister.tenantId', user.tenantId)
+        .eq('tenantId', user.tenantId)
         .order('createdAt', { ascending: false });
 
       if (error) throw error;
@@ -242,6 +235,7 @@ export const useCashStore = create<CashState>((set, get) => ({
         const { txType, method } = mapDbToFrontendType(m.type, m.description, m.paymentMethod);
         return {
           id: m.id,
+          registerId: m.registerId ?? undefined,
           type: txType,
           amount: m.amount,
           method,
@@ -323,6 +317,7 @@ export const useCashStore = create<CashState>((set, get) => ({
 
       const openTx: CashTransaction = {
         id: openMovement.id,
+        registerId: reg.id,
         type: 'SISTEMA',
         amount: amount,
         method: 'EFECTIVO',
@@ -388,6 +383,7 @@ export const useCashStore = create<CashState>((set, get) => ({
 
       const closeTx: CashTransaction = {
         id: closeMovement.id,
+        registerId: session.id,
         type: 'SISTEMA',
         amount: amount,
         method: 'EFECTIVO',
@@ -413,20 +409,26 @@ export const useCashStore = create<CashState>((set, get) => ({
   },
 
   addTransaction: async (tx) => {
-    const session = get().session;
+    let session = get().session;
     const user = useAuthStore.getState().user;
 
-    if (!session.isOpen || session.id === '1') {
-      // Local fallback if no session is open
-      const tempTx: CashTransaction = {
-        ...tx,
-        id: 'temp-' + Math.random().toString(36).substr(2, 9),
-        timestamp: new Date().toISOString()
-      };
-      set((state) => ({
-        history: [tempTx, ...state.history]
-      }));
-      return;
+    // Check if there is an active register in Supabase if store wasn't initialized or was opened by another user
+    let activeRegisterId: string | null = (session.isOpen && session.id !== '1') ? session.id : null;
+    if (!activeRegisterId && user?.tenantId) {
+      try {
+        const { data: openRegs } = await supabase
+          .from('CashRegister')
+          .select('id')
+          .eq('status', 'OPEN')
+          .eq('tenantId', user.tenantId)
+          .order('openedAt', { ascending: false })
+          .limit(1);
+        if (openRegs && openRegs.length > 0) {
+          activeRegisterId = openRegs[0].id;
+        }
+      } catch (err) {
+        console.warn('Could not verify open register in Supabase:', err);
+      }
     }
 
     // 1. Optimistic Update
@@ -434,10 +436,11 @@ export const useCashStore = create<CashState>((set, get) => ({
     const tempTx: CashTransaction = {
       ...tx,
       id: tempId,
+      registerId: activeRegisterId || undefined,
       timestamp: new Date().toISOString()
     };
 
-    // Only EFECTIVO payments change the physical balance
+    // Only EFECTIVO payments change the physical cash balance
     let newBalance = session.currentBalance;
     if (tx.method === 'EFECTIVO') {
       newBalance = tx.type === 'EGRESO'
@@ -446,29 +449,36 @@ export const useCashStore = create<CashState>((set, get) => ({
     }
 
     set((state) => ({
-      session: {
+      session: activeRegisterId ? {
         ...state.session,
+        isOpen: true,
+        id: state.session.id === '1' ? activeRegisterId! : state.session.id,
         currentBalance: newBalance,
         transactions: [tempTx, ...state.session.transactions]
-      },
+      } : state.session,
       history: [tempTx, ...state.history]
     }));
 
-    // 2. Persist to Supabase — store paymentMethod and profit
+    // 2. Persist to Supabase — store paymentMethod, profit and tenantId
     try {
+      const movementPayload: any = {
+        id: crypto.randomUUID(),
+        tenantId: user?.tenantId,
+        amount: tx.amount,
+        type: mapFrontendTypeToDb(tx.type, tx.amount),
+        paymentMethod: tx.method,
+        profit: tx.profit ?? null,
+        description: tx.description,
+        details: tx.details ?? null
+      };
+
+      if (activeRegisterId) {
+        movementPayload.registerId = activeRegisterId;
+      }
+
       const { data: savedMovement, error: movError } = await supabase
         .from('CashMovement')
-        .insert({
-          id: crypto.randomUUID(),
-          registerId: session.id,
-          tenantId: user?.tenantId,
-          amount: tx.amount,
-          type: mapFrontendTypeToDb(tx.type, tx.amount),
-          paymentMethod: tx.method,
-          profit: tx.profit ?? null,
-          description: tx.description,
-          details: tx.details ?? null
-        })
+        .insert(movementPayload)
         .select()
         .single();
 
@@ -481,12 +491,14 @@ export const useCashStore = create<CashState>((set, get) => ({
           transactions: state.session.transactions.map((t) => t.id === tempId ? {
             ...t,
             id: savedMovement.id,
+            registerId: savedMovement.registerId || activeRegisterId || undefined,
             timestamp: parseUtcDateString(savedMovement.createdAt)
           } : t)
         },
         history: state.history.map((t) => t.id === tempId ? {
           ...t,
           id: savedMovement.id,
+          registerId: savedMovement.registerId || activeRegisterId || undefined,
           timestamp: parseUtcDateString(savedMovement.createdAt)
         } : t)
       }));
@@ -500,3 +512,44 @@ export const useCashStore = create<CashState>((set, get) => ({
     }
   }
 }));
+
+// Realtime subscription helper across all connected clients / tabs
+export const subscribeToCashRealtime = (tenantId: string) => {
+  if (!tenantId) return () => {};
+
+  const channel = supabase
+    .channel(`cash-realtime-${tenantId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'CashMovement',
+        filter: `tenantId=eq.${tenantId}`
+      },
+      () => {
+        // Refresh active session and history silently when movements occur
+        useCashStore.getState().fetchActiveSession();
+        useCashStore.getState().fetchHistory();
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'CashRegister',
+        filter: `tenantId=eq.${tenantId}`
+      },
+      () => {
+        // Refresh active session and past registers when box is opened or closed
+        useCashStore.getState().fetchActiveSession();
+        useCashStore.getState().fetchPastRegisters();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};

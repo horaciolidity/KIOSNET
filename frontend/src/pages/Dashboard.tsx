@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Package, 
-  DollarSign, 
+import {
+  Users,
+  Package,
+  DollarSign,
   AlertTriangle,
   CheckCircle2,
   Lock,
@@ -72,20 +72,26 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
-  const salesToday = session.isOpen 
+
+  // Real Sales today across the entire calendar day (all registers / history)
+  const salesToday = history.filter(t => {
+    if (t.type !== 'VENTA') return false;
+    try {
+      const dateStr = new Date(t.timestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      const todayStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+      return dateStr === todayStr;
+    } catch (e) {
+      return false;
+    }
+  }).reduce((s, t) => s + t.amount, 0);
+
+  // Sales in current active shift/session
+  const sessionSales = session.isOpen
     ? session.transactions.filter(t => t.type === 'VENTA').reduce((s, t) => s + t.amount, 0)
-    : history.filter(t => {
-        if (t.type !== 'VENTA') return false;
-        try {
-          const dateStr = new Date(t.timestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-          const todayStr = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
-          return dateStr === todayStr;
-        } catch (e) {
-          return false;
-        }
-      }).reduce((s, t) => s + t.amount, 0);
+    : 0;
+
   const isStatsLoading = inventoryLoading || cashLoading || customerLoading;
-  
+
   // Real Database Subscription Details
   const isPlanExpired = user?.subExpiresAt ? new Date(user.subExpiresAt) <= new Date() : false;
   const hasActiveSub = Boolean(user?.subActive && !isPlanExpired);
@@ -96,7 +102,7 @@ const Dashboard: React.FC = () => {
 
   // Calculate real remaining license days
   const daysRemaining = (user?.subExpiresAt && !isPlanExpired)
-    ? Math.max(0, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) 
+    ? Math.max(0, Math.ceil((new Date(user.subExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   const handleSelectPlan = (plan: 'STANDARD' | 'PRO') => {
@@ -117,7 +123,7 @@ const Dashboard: React.FC = () => {
               <p className="text-sm font-black text-blue-600">{activePlan}</p>
             </div>
             <div className={`p-2 rounded-xl ${activePlan === 'FREE' ? 'bg-slate-100' : 'bg-blue-600 text-white'}`}>
-              {activePlan === 'PRO' ? <Crown size={20}/> : <Zap size={20}/>}
+              {activePlan === 'PRO' ? <Crown size={20} /> : <Zap size={20} />}
             </div>
           </div>
         </div>
@@ -156,14 +162,14 @@ const Dashboard: React.FC = () => {
             <span className="text-sm font-black text-slate-500">{salesUsed} / {salesLimit}</span>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden">
-            <div 
+            <div
               className={`h-full rounded-full transition-all duration-1000 ${salesPercentage > 80 ? 'bg-red-500' : 'bg-blue-600'}`}
               style={{ width: `${salesPercentage}%` }}
             ></div>
           </div>
           <p className="text-sm text-slate-500 font-medium italic">
-            {salesUsed >= salesLimit 
-              ? 'Has agotado tus 50 ventas gratuitas. Tu facturación en el POS se ha bloqueado. Por favor, selecciona un plan mensual debajo para continuar.' 
+            {salesUsed >= salesLimit
+              ? 'Has agotado tus 50 ventas gratuitas. Tu facturación en el POS se ha bloqueado. Por favor, selecciona un plan mensual debajo para continuar.'
               : `Te quedan ${salesLimit - salesUsed} ventas gratuitas para probar el sistema.`}
           </p>
         </div>
@@ -199,7 +205,13 @@ const Dashboard: React.FC = () => {
 
       {/* Stats Grid */}
       <div id="tour-dashboard-stats" className={`grid grid-cols-2 lg:grid-cols-4 gap-6 transition-all duration-300 ${isStatsLoading ? 'opacity-65 animate-pulse pointer-events-none' : ''}`}>
-        <StatCard title="Ventas Hoy" value={`$${salesToday.toLocaleString()}`} icon={<DollarSign className="w-6 h-6 text-blue-600" />} color="blue" />
+        <StatCard
+          title="Ventas Hoy"
+          value={`$${salesToday.toLocaleString()}`}
+          subtext={session.isOpen ? `Turno en caja: $${sessionSales.toLocaleString()}` : 'Caja cerrada'}
+          icon={<DollarSign className="w-6 h-6 text-blue-600" />}
+          color="blue"
+        />
         <StatCard title="Productos" value={products.length.toString()} icon={<Package className="w-6 h-6 text-emerald-600" />} color="emerald" />
         <StatCard title="Stock Bajo" value={lowStockCount.toString()} icon={<AlertTriangle className="w-6 h-6 text-orange-600" />} color="orange" />
         <StatCard title="Clientes" value={customers.length.toString()} icon={<Users className="w-6 h-6 text-indigo-600" />} color="indigo" />
@@ -215,7 +227,7 @@ const Dashboard: React.FC = () => {
         <h2 className="text-2xl font-black text-slate-900 dark:text-white">Planes de Suscripción Mensual</h2>
         <div className="grid grid-cols-2 gap-4">
           {/* Standard Plan */}
-          <PlanCard 
+          <PlanCard
             title="Plan Estándar"
             price={prices.price_standard}
             color="blue"
@@ -233,7 +245,7 @@ const Dashboard: React.FC = () => {
           />
 
           {/* Pro Plan */}
-          <PlanCard 
+          <PlanCard
             title="Plan Pro"
             price={prices.price_pro}
             color="indigo"
@@ -267,7 +279,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => navigate('/billing')}
           className="relative z-10 bg-white text-blue-600 px-10 py-6 rounded-[28px] font-black text-2xl flex items-center gap-4 hover:bg-slate-50 transition-all shadow-2xl active:scale-95 group"
         >
@@ -281,7 +293,7 @@ const Dashboard: React.FC = () => {
   );
 };
 
-const StatCard = ({ title, value, icon, color }: any) => {
+const StatCard = ({ title, value, icon, color, subtext }: any) => {
   const styles: any = {
     blue: 'bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20',
     emerald: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20',
@@ -298,16 +310,18 @@ const StatCard = ({ title, value, icon, color }: any) => {
       </div>
       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{title}</p>
       <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</h2>
+      {subtext && (
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">{subtext}</p>
+      )}
     </div>
   );
 };
 
 const PlanCard = ({ title, price, featured, features, active, onSelect }: any) => (
-  <div className={`p-10 rounded-[48px] border-2 flex flex-col justify-between transition-all relative ${
-    featured 
-    ? 'bg-white dark:bg-slate-900 border-indigo-600 shadow-2xl shadow-indigo-600/10 scale-[1.02]' 
-    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm'
-  }`}>
+  <div className={`p-10 rounded-[48px] border-2 flex flex-col justify-between transition-all relative ${featured
+      ? 'bg-white dark:bg-slate-900 border-indigo-600 shadow-2xl shadow-indigo-600/10 scale-[1.02]'
+      : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm'
+    }`}>
     {featured && (
       <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-xl">
         Recomendado
@@ -331,11 +345,10 @@ const PlanCard = ({ title, price, featured, features, active, onSelect }: any) =
         ))}
       </ul>
     </div>
-    <button onClick={active ? undefined : onSelect} className={`mt-10 w-full py-5 rounded-[24px] font-black text-lg transition-all ${
-      active 
-      ? 'bg-emerald-100 text-emerald-600 cursor-default' 
-      : 'bg-slate-900 text-white hover:bg-slate-800'
-    }`}>
+    <button onClick={active ? undefined : onSelect} className={`mt-10 w-full py-5 rounded-[24px] font-black text-lg transition-all ${active
+        ? 'bg-emerald-100 text-emerald-600 cursor-default'
+        : 'bg-slate-900 text-white hover:bg-slate-800'
+      }`}>
       {active ? 'PLAN ACTIVO' : 'SELECCIONAR PLAN'}
     </button>
   </div>
@@ -367,7 +380,7 @@ const HardwareTips = ({ hardwareLinks }: { hardwareLinks: { link_scanner: string
 
       {/* Grid of Devices */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Barcode Scanner Card */}
         <div className="group relative rounded-[32px] border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 hover:-translate-y-1">
           <div className="space-y-4">
@@ -439,14 +452,14 @@ const HardwareTips = ({ hardwareLinks }: { hardwareLinks: { link_scanner: string
               <span className="text-[10px] font-black text-amber-500 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full uppercase tracking-wider">
                 ⭐ Exclusivo PRO
               </span>
-              <a 
-                href="/display" 
+              <a
+                href="/display"
                 onClick={(e) => {
                   e.preventDefault();
                   window.open('/display', 'CustomerDisplay', 'width=1024,height=768,menubar=no,toolbar=no,location=no,status=no');
                 }}
-                target="_blank" 
-                rel="noopener noreferrer" 
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs font-black text-blue-600 hover:underline"
               >
                 Abrir Pantalla →
@@ -477,10 +490,10 @@ const HardwareTips = ({ hardwareLinks }: { hardwareLinks: { link_scanner: string
             </p>
           </div>
         </div>
-        <a 
+        <a
           href="https://wa.me/5492617048835?text=Hola!%20Necesito%20ayuda%20para%20conectar%20el%20lector/impresora%20en%20KIOSNET"
-          target="_blank" 
-          rel="noopener noreferrer" 
+          target="_blank"
+          rel="noopener noreferrer"
           className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-sm px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap"
         >
           Hablar con Soporte

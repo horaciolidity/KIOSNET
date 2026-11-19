@@ -16,15 +16,16 @@ import {
 import { useCashStore } from '../store/useCashStore';
 
 const History: React.FC = () => {
-  const { history, fetchHistory, loading } = useCashStore();
+  const { history, fetchHistory, session, fetchActiveSession, loading } = useCashStore();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'EGRESO' | 'SISTEMA'>('TODOS');
-  const [filterPeriod, setFilterPeriod] = useState<'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('HOY');
+  const [filterType, setFilterType] = useState<'TODOS' | 'VENTA' | 'PAGO_DEUDA' | 'EGRESO' | 'SISTEMA'>('TODOS');
+  const [filterPeriod, setFilterPeriod] = useState<'TURNO_ACTUAL' | 'HOY' | 'SEMANA' | 'QUINCENA' | 'MES'>('HOY');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   React.useEffect(() => {
     fetchHistory();
-  }, [fetchHistory]);
+    fetchActiveSession();
+  }, [fetchHistory, fetchActiveSession]);
 
   const filteredHistory = history.filter(item => {
     const matchesSearch = item.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -35,7 +36,15 @@ const History: React.FC = () => {
     const now = new Date();
     
     let matchesPeriod = true;
-    if (filterPeriod === 'HOY') {
+    if (filterPeriod === 'TURNO_ACTUAL') {
+      if (!session.isOpen) {
+        matchesPeriod = false;
+      } else {
+        const matchesRegister = item.registerId && session.id && item.registerId === session.id;
+        const matchesTime = session.openedAt ? new Date(item.timestamp).getTime() >= new Date(session.openedAt).getTime() : false;
+        matchesPeriod = Boolean(matchesRegister || matchesTime);
+      }
+    } else if (filterPeriod === 'HOY') {
       const dateStr = itemDate.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
       const todayStr = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
       matchesPeriod = dateStr === todayStr;
@@ -61,7 +70,10 @@ const History: React.FC = () => {
   };
 
   const totalSales = filteredHistory.filter(t => t.type === 'VENTA').reduce((s, t) => s + t.amount, 0);
+  const totalDebtPaid = filteredHistory.filter(t => t.type === 'PAGO_DEUDA').reduce((s, t) => s + t.amount, 0);
+  const totalManualIncomes = filteredHistory.filter(t => t.type === 'INGRESO').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = filteredHistory.filter(t => t.type === 'EGRESO').reduce((s, t) => s + t.amount, 0);
+  const netBalance = (totalSales + totalDebtPaid + totalManualIncomes) - totalExpenses;
 
   return (
     <div className="md:p-8 p-4 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-screen overflow-y-auto">
@@ -85,15 +97,17 @@ const History: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div id="tour-hist-summary" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div id="tour-hist-summary" className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <SummaryCard title="Ventas en Historial" amount={totalSales} icon={<TrendingUp size={20}/>} color="emerald" isLoading={loading && history.length === 0} />
+        <SummaryCard title="Cobro Deudas / Ingresos" amount={totalDebtPaid + totalManualIncomes} icon={<Banknote size={20}/>} color="indigo" isLoading={loading && history.length === 0} />
         <SummaryCard title="Gastos en Historial" amount={totalExpenses} icon={<ArrowDownCircle size={20}/>} color="red" isLoading={loading && history.length === 0} />
-        <SummaryCard title="Balance Neto" amount={totalSales - totalExpenses} icon={<HistoryIcon size={20}/>} color="blue" isLoading={loading && history.length === 0} />
+        <SummaryCard title="Balance Neto" amount={netBalance} icon={<HistoryIcon size={20}/>} color="blue" isLoading={loading && history.length === 0} />
       </div>
 
       {/* Period Filter Tabs */}
-      <div id="tour-hist-period" className="flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-lg">
+      <div id="tour-hist-period" className="flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm max-w-2xl overflow-x-auto">
         {[
+          { key: 'TURNO_ACTUAL', label: session.isOpen ? 'Turno Actual (Caja)' : 'Turno Actual (Cerrada)' },
           { key: 'HOY', label: 'Hoy' },
           { key: 'SEMANA', label: 'Esta Semana' },
           { key: 'QUINCENA', label: 'Esta Quincena' },
@@ -102,7 +116,7 @@ const History: React.FC = () => {
           <button
             key={p.key}
             onClick={() => setFilterPeriod(p.key as any)}
-            className={`flex-1 text-center py-2.5 rounded-xl text-xs font-black transition-all ${
+            className={`flex-1 text-center py-2.5 px-3 rounded-xl text-xs font-black whitespace-nowrap transition-all ${
               filterPeriod === p.key
               ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
               : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -125,18 +139,24 @@ const History: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
-          {['TODOS', 'VENTA', 'EGRESO', 'SISTEMA'].map((type) => (
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'TODOS', label: 'Todos' },
+            { key: 'VENTA', label: 'Ventas' },
+            { key: 'PAGO_DEUDA', label: 'Cobro Deuda' },
+            { key: 'EGRESO', label: 'Gastos' },
+            { key: 'SISTEMA', label: 'Sistema' }
+          ].map((item) => (
             <button 
-              key={type}
-              onClick={() => setFilterType(type as any)}
-              className={`px-6 py-3 rounded-2xl text-xs font-black transition-all border ${
-                filterType === type 
+              key={item.key}
+              onClick={() => setFilterType(item.key as any)}
+              className={`px-5 py-3 rounded-2xl text-xs font-black transition-all border ${
+                filterType === item.key 
                 ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20' 
                 : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 hover:border-slate-200 dark:hover:border-slate-700'
               }`}
             >
-              {type}
+              {item.label}
             </button>
           ))}
         </div>
