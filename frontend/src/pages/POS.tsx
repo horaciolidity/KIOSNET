@@ -243,44 +243,63 @@ const POS: React.FC = () => {
     }
 
     try {
-      const [{ count: salesCount }, { data: liveTenant }] = await Promise.all([
-        supabase
-          .from('Sale')
-          .select('*', { count: 'exact', head: true })
-          .eq('tenantId', user.tenantId),
-        supabase
-          .from('Tenant')
-          .select('plan, subActive, subExpiresAt')
-          .eq('id', user.tenantId)
-          .single()
-      ]);
+      // 1. Subscription verification (bypassed if already active Standard/Pro to avoid blocking database queries)
+      const isLocallyActive = Boolean(user?.subActive && user?.subExpiresAt && new Date(user.subExpiresAt) > new Date() && user?.plan !== 'FREE');
+      
+      if (!isLocallyActive) {
+        const [{ count: salesCount }, { data: liveTenant }] = await Promise.all([
+          supabase
+            .from('Sale')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenantId', user.tenantId),
+          supabase
+            .from('Tenant')
+            .select('plan, subActive, subExpiresAt')
+            .eq('id', user.tenantId)
+            .single()
+        ]);
 
-      const effectivePlan = liveTenant?.plan || user?.plan || 'FREE';
-      const liveExpiresAt = liveTenant?.subExpiresAt || user?.subExpiresAt;
-      const isLiveExpired = liveExpiresAt ? new Date(liveExpiresAt) <= new Date() : false;
-      const hasLiveActiveSub = Boolean(liveTenant?.subActive && !isLiveExpired);
-      const isLiveTrialActive = effectivePlan === 'FREE' && !isLiveExpired && ((salesCount ?? 0) < 50);
-      const isLiveBlocked = !hasLiveActiveSub && !isLiveTrialActive;
+        const effectivePlan = liveTenant?.plan || user?.plan || 'FREE';
+        const liveExpiresAt = liveTenant?.subExpiresAt || user?.subExpiresAt;
+        const isLiveExpired = liveExpiresAt ? new Date(liveExpiresAt) <= new Date() : false;
+        const hasLiveActiveSub = Boolean(liveTenant?.subActive && !isLiveExpired);
+        const isLiveTrialActive = effectivePlan === 'FREE' && !isLiveExpired && ((salesCount ?? 0) < 50);
+        const isLiveBlocked = !hasLiveActiveSub && !isLiveTrialActive;
 
-      // Auto-sync database if it expired
-      if (liveTenant?.subActive && isLiveExpired) {
-        supabase
-          .from('Tenant')
-          .update({ subActive: false })
-          .eq('id', user.tenantId)
-          .then();
-        useAuthStore.getState().setSubscriptionActive(false);
-      }
+        // Auto-sync database if it expired
+        if (liveTenant?.subActive && isLiveExpired) {
+          supabase
+            .from('Tenant')
+            .update({ subActive: false })
+            .eq('id', user.tenantId)
+            .then();
+          useAuthStore.getState().setSubscriptionActive(false);
+        }
 
-      if (isLiveBlocked) {
-        alert('Tu período de facturación ha vencido o has alcanzado el límite de ventas permitidas. Por favor, activa o renueva tu suscripción para continuar.');
-        return;
+        if (isLiveBlocked) {
+          alert('Tu período de facturación ha vencido o has alcanzado el límite de ventas permitidas. Por favor, activa o renueva tu suscripción para continuar.');
+          return;
+        }
       }
 
       const newSaleId = crypto.randomUUID();
 
-      // 2. Create the sale in Supabase
-      const { error: saleErr } = await supabase
+      // 2. Optimistic UI update: reduce stock immediately in memory
+      useInventoryStore.setState((state) => ({
+        products: state.products.map(p => {
+          const cartItem = cart.find(c => c.id === p.id);
+          return cartItem ? { ...p, stock: Math.max(0, p.stock - cartItem.quantity) } : p;
+        })
+      }));
+
+      if (paymentMethod === 'CUENTA_CORRIENTE' && selectedCustomerId) {
+        useCustomerStore.setState((state) => ({
+          customers: state.customers.map(c => c.id === selectedCustomerId ? { ...c, debt: (c.debt || 0) + total } : c)
+        }));
+      }
+
+      // 3. Parallelize database operations: Sale, SaleItems, Stock updates, and Customer balance
+      const saleInsertPromise = supabase
         .from('Sale')
         .insert({
           id: newSaleId,
@@ -297,10 +316,7 @@ const POS: React.FC = () => {
           updatedAt: new Date().toISOString()
         });
 
-      if (saleErr) throw saleErr;
-
-      // 3. Create sale items
-      const { error: itemsErr } = await supabase
+      const itemsInsertPromise = supabase
         .from('SaleItem')
         .insert(cart.map(item => ({
           id: crypto.randomUUID(),
@@ -311,38 +327,49 @@ const POS: React.FC = () => {
           costPrice: Number(item.costPrice)
         })));
 
-      if (itemsErr) throw itemsErr;
-
-      // 4. Decrement physical stock for each product
-      for (const item of cart) {
-        const { data: prod } = await supabase
+      const stockUpdatePromises = cart.map((item) => {
+        const localProd = products.find(p => p.id === item.id);
+        const currentStock = localProd ? localProd.stock : item.stock;
+        return supabase
           .from('Product')
-          .select('stock')
-          .eq('id', item.id)
-          .single();
-
-        const currentStock = prod?.stock || 0;
-        await supabase
-          .from('Product')
-          .update({ stock: currentStock - item.quantity })
+          .update({ stock: Math.max(0, currentStock - item.quantity) })
           .eq('id', item.id);
-      }
+      });
 
-      // 5. Update customer balance if fia (CREDIT)
-      if (paymentMethod === 'CUENTA_CORRIENTE' && selectedCustomerId) {
-        const { data: cust } = await supabase
-          .from('Customer')
-          .select('balance')
-          .eq('id', selectedCustomerId)
-          .single();
+      const customerUpdatePromise = (paymentMethod === 'CUENTA_CORRIENTE' && selectedCustomerId)
+        ? (async () => {
+            const { data: cust } = await supabase
+              .from('Customer')
+              .select('balance')
+              .eq('id', selectedCustomerId)
+              .single();
+            const currentBalance = cust?.balance || 0;
+            return supabase
+              .from('Customer')
+              .update({ balance: currentBalance + total })
+              .eq('id', selectedCustomerId);
+          })()
+        : Promise.resolve();
 
-        const currentBalance = cust?.balance || 0;
-        await supabase
-          .from('Customer')
-          .update({ balance: currentBalance + total })
-          .eq('id', selectedCustomerId);
-      }
+      // Wait for all DB writes concurrently in a single parallel roundtrip
+      const [saleRes, itemsRes] = await Promise.all([
+        saleInsertPromise,
+        itemsInsertPromise,
+        ...stockUpdatePromises,
+        customerUpdatePromise
+      ]);
 
+      if (saleRes.error) throw saleRes.error;
+      if (itemsRes.error) throw itemsRes.error;
+
+      // 4. INSTANT TRANSITION: Open invoice & options modal immediately!
+      setSaleId(newSaleId);
+      setIsFinished(true);
+      AudioHelper.playSuccessBeep();
+      setIsWaitingForMP(false);
+      setIsSubmitting(false);
+
+      // 5. Register in cash store
       const customer = customers.find(c => c.id === selectedCustomerId);
       const customerName = customer ? customer.name : '';
 
@@ -365,15 +392,10 @@ const POS: React.FC = () => {
         }
       });
 
-      // Reload products and customers to ensure stock levels and balances are 100% correct in UI!
-      useInventoryStore.getState().fetchProducts();
-      useCustomerStore.getState().fetchCustomers();
+      // 6. Background sync to maintain perfect state without freezing UI
+      useInventoryStore.getState().fetchProducts().catch(console.error);
+      useCustomerStore.getState().fetchCustomers().catch(console.error);
 
-      setSaleId(newSaleId);
-      setIsFinished(true);
-      AudioHelper.playSuccessBeep();
-      setIsWaitingForMP(false);
-      
       // Dynamic database-backed salesCount increment
       const currentAuth = useAuthStore.getState();
       if (currentAuth.user) {
@@ -382,12 +404,11 @@ const POS: React.FC = () => {
           salesCount: (currentAuth.user.salesCount || 0) + 1
         }, currentAuth.token || '');
       }
-      
+
       useSettingsStore.getState().incrementSales();
     } catch (error: any) {
       console.error('Error finalizando la venta:', error);
       alert(`Hubo un error al procesar la venta: ${error.message || 'Error inesperado'}`);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -399,14 +420,21 @@ const POS: React.FC = () => {
     }
 
     try {
-      // 1. Mark sale as completed in Supabase
-      await supabase
+      // 1. Optimistic local stock update
+      useInventoryStore.setState((state) => ({
+        products: state.products.map(p => {
+          const cartItem = cart.find(c => c.id === p.id);
+          return cartItem ? { ...p, stock: Math.max(0, p.stock - cartItem.quantity) } : p;
+        })
+      }));
+
+      // 2. Mark sale as completed, insert items & decrement physical stock in parallel
+      const saleUpdatePromise = supabase
         .from('Sale')
         .update({ status: 'COMPLETED' })
         .eq('id', targetSaleId);
 
-      // 2. Create sale items
-      await supabase
+      const itemsPromise = supabase
         .from('SaleItem')
         .insert(cart.map(item => ({
           id: crypto.randomUUID(),
@@ -417,26 +445,27 @@ const POS: React.FC = () => {
           costPrice: Number(item.costPrice)
         })));
 
-      // 3. Decrement physical stock
-      for (const item of cart) {
-        const { data: prod } = await supabase
+      const stockPromises = cart.map((item) => {
+        const localProd = products.find(p => p.id === item.id);
+        const currentStock = localProd ? localProd.stock : item.stock;
+        return supabase
           .from('Product')
-          .select('stock')
-          .eq('id', item.id)
-          .single();
-
-        const currentStock = prod?.stock || 0;
-        await supabase
-          .from('Product')
-          .update({ stock: currentStock - item.quantity })
+          .update({ stock: Math.max(0, currentStock - item.quantity) })
           .eq('id', item.id);
-      }
-      
-      // Refresh stores
-      useInventoryStore.getState().fetchProducts();
-      useCustomerStore.getState().fetchCustomers();
+      });
 
-      // Register local cash transaction
+      await Promise.all([saleUpdatePromise, itemsPromise, ...stockPromises]);
+
+      // 3. INSTANT TRANSITION: Open invoice & options immediately!
+      setIsFinished(true);
+      setIsWaitingForMP(false);
+      setMpInitPoint('');
+      setMpQrData('');
+      setMpQrImage('');
+      AudioHelper.playSuccessBeep();
+      useSettingsStore.getState().incrementSales();
+
+      // 4. Register local cash transaction
       const customer = customers.find(c => c.id === selectedCustomerId);
       const customerName = customer ? customer.name : '';
 
@@ -459,12 +488,9 @@ const POS: React.FC = () => {
         }
       });
 
-      setIsFinished(true);
-      setIsWaitingForMP(false);
-      setMpInitPoint('');
-      setMpQrData('');
-      setMpQrImage('');
-      useSettingsStore.getState().incrementSales();
+      // 5. Background sync
+      useInventoryStore.getState().fetchProducts().catch(console.error);
+      useCustomerStore.getState().fetchCustomers().catch(console.error);
     } catch (err) {
       console.error('Error aprobando venta:', err);
       alert('Error registrando la venta. Revise la conexión e intente nuevamente.');
