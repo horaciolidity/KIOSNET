@@ -480,8 +480,8 @@ const SuperAdmin: React.FC = () => {
 
       {feedbackMessage && (
         <div className={`p-4 rounded-2xl border flex items-center gap-3 ${feedbackMessage.type === 'success'
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
-            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
+          : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400'
           }`}>
           {feedbackMessage.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
           <span className="font-bold text-sm">{feedbackMessage.text}</span>
@@ -622,7 +622,7 @@ const SuperAdmin: React.FC = () => {
             value={links.transfer_alias}
             onChange={(e) => setLinks(prev => ({ ...prev, transfer_alias: e.target.value }))}
             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-4 font-bold text-slate-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
-            placeholder="ej: horacio.asa o CVU/CBU completo"
+            placeholder="ej: kiosnet o CVU/CBU completo"
           />
           <p className="text-[10px] text-slate-400">Este alias se muestra a los clientes cuando reportan un pago por transferencia bancaria.</p>
         </div>
@@ -932,8 +932,8 @@ const SuperAdmin: React.FC = () => {
             <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[32px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-300">
               {/* Modal Header */}
               <div className={`p-6 text-white flex justify-between items-start ${isSubtracting
-                  ? 'bg-gradient-to-r from-orange-600 to-red-600'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600'
+                ? 'bg-gradient-to-r from-orange-600 to-red-600'
+                : 'bg-gradient-to-r from-emerald-600 to-teal-600'
                 }`}>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-white/80 mb-1">
@@ -959,8 +959,8 @@ const SuperAdmin: React.FC = () => {
                     <button
                       onClick={() => setActivatePlan('STANDARD')}
                       className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${activatePlan === 'STANDARD'
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
-                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
+                        ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-blue-400'
                         }`}
                     >
                       <Zap size={14} className="inline mr-1.5" />
@@ -969,8 +969,8 @@ const SuperAdmin: React.FC = () => {
                     <button
                       onClick={() => setActivatePlan('PRO')}
                       className={`flex-1 py-3 rounded-xl font-black text-sm border transition-all ${activatePlan === 'PRO'
-                          ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/20'
-                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400'
+                        ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/20'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-amber-400'
                         }`}
                     >
                       <Crown size={14} className="inline mr-1.5" />
@@ -993,8 +993,8 @@ const SuperAdmin: React.FC = () => {
                         key={`+${d}`}
                         onClick={() => setActivateDays(d)}
                         className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${activateDays === d
-                            ? 'bg-emerald-600 border-emerald-500 text-white'
-                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-400'
+                          ? 'bg-emerald-600 border-emerald-500 text-white'
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-emerald-400'
                           }`}
                       >
                         +{d}d
@@ -1010,8 +1010,8 @@ const SuperAdmin: React.FC = () => {
                         key={d}
                         onClick={() => setActivateDays(d)}
                         className={`flex-1 py-2 rounded-xl font-black text-xs border transition-all ${activateDays === d
-                            ? 'bg-red-600 border-red-500 text-white'
-                            : 'bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900/40 text-red-400 hover:border-red-400'
+                          ? 'bg-red-600 border-red-500 text-white'
+                          : 'bg-slate-50 dark:bg-slate-950 border-red-200 dark:border-red-900/40 text-red-400 hover:border-red-400'
                           }`}
                       >
                         {d}d
@@ -1059,8 +1059,8 @@ const SuperAdmin: React.FC = () => {
                     )}
                     disabled={togglingTenantId === activateModal.tenantId}
                     className={`flex-1 ${isSubtracting
-                        ? 'bg-gradient-to-r from-orange-600 to-red-600 shadow-red-600/20'
-                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-600/20'
+                      ? 'bg-gradient-to-r from-orange-600 to-red-600 shadow-red-600/20'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 shadow-emerald-600/20'
                       } hover:opacity-90 text-white py-3.5 rounded-2xl font-black text-sm transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2`}
                   >
                     {togglingTenantId === activateModal.tenantId ? (

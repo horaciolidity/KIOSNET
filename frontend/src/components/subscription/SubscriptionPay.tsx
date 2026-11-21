@@ -24,7 +24,7 @@ const SubscriptionPay: React.FC = () => {
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
   const [prices, setPrices] = useState({ price_standard: 12320, price_pro: 15730 });
   const [paymentSessionStart, setPaymentSessionStart] = useState<number>(Date.now());
-  const [transferAlias, setTransferAlias] = useState<string>('horacio.asa');
+  const [transferAlias, setTransferAlias] = useState<string>('kiosnet');
 
   // Helper to verify and activate payment directly from client side
   const checkAndActivatePayment = async (plan: 'STANDARD' | 'PRO', months: number, paymentId?: string | null) => {
@@ -916,9 +916,9 @@ const SubscriptionPay: React.FC = () => {
                     <div className="bg-slate-950 p-3 rounded-lg border border-white/5 flex justify-between items-center">
                       <div>
                         <p className="text-[10px] text-slate-500 uppercase">Alias</p>
-                        <p className="text-sm font-bold text-blue-400 font-mono">horacio.asa</p>
+                        <p className="text-sm font-bold text-blue-400 font-mono">{transferAlias}</p>
                       </div>
-                      <button onClick={() => navigator.clipboard.writeText('horacio.asa')} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">Copiar</button>
+                      <button onClick={() => navigator.clipboard.writeText(transferAlias)} className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all">Copiar</button>
                     </div>
                     <p className="text-xs text-slate-400 mt-2">
                       Transfiere el monto exacto de <strong>${((selectedPlan === 'PRO' ? prices.price_pro : prices.price_standard) * selectedMonths).toLocaleString()} ARS</strong> y luego haz clic en el botón de abajo para notificar el pago.

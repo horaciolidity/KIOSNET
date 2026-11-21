@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Package,
   Plus,
+  Minus,
   Search,
   Filter,
   Download,
@@ -21,6 +22,152 @@ import AudioHelper from '../utils/audioHelper';
 
 const CATEGORIES: ProductCategory[] = ['Lacteos', 'Panaderia', 'Bebidas', 'Cigarrillos', 'Fiambreria', 'Otros'];
 const UNITS: ProductUnit[] = ['UNIDAD', 'KILO', 'LITRO'];
+
+interface InlineStockEditorProps {
+  productId: string;
+  stock: number;
+  minStock: number;
+  disabled?: boolean;
+  onUpdateStock: (id: string, newStock: number) => void;
+}
+
+const InlineStockEditor: React.FC<InlineStockEditorProps> = ({
+  productId,
+  stock,
+  minStock,
+  disabled = false,
+  onUpdateStock,
+}) => {
+  const [localValue, setLocalValue] = useState<string>(stock.toString());
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalValue(stock.toString());
+  }, [stock]);
+
+  const commitStock = async (newVal: number) => {
+    const validVal = Math.max(0, newVal);
+    setLocalValue(validVal.toString());
+    if (validVal !== stock) {
+      setIsSaving(true);
+      try {
+        await onUpdateStock(productId, validVal);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleStep = (delta: number) => {
+    if (disabled || isSaving) return;
+    const current = parseFloat(localValue) || 0;
+    const next = Math.max(0, current + delta);
+    commitStock(next);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+    if (disabled || isSaving) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY < 0 ? 1 : -1;
+    handleStep(delta);
+  };
+
+  const handleBlur = () => {
+    if (disabled || isSaving) return;
+    const num = parseFloat(localValue);
+    if (isNaN(num)) {
+      setLocalValue(stock.toString());
+    } else {
+      commitStock(num);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setLocalValue(stock.toString());
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  if (disabled) {
+    return (
+      <div>
+        <div className="flex items-center gap-3">
+          <span className={`text-xl font-black ${stock <= minStock ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+            {stock}
+          </span>
+          {stock <= minStock && (
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+          )}
+        </div>
+        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Min: {minStock}</p>
+      </div>
+    );
+  }
+
+  const isLow = stock <= minStock;
+
+  return (
+    <div className="space-y-1">
+      <div 
+        className={`flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-2xl border transition-all ${
+          isLow ? 'border-red-300 dark:border-red-500/40 bg-red-50/20' : 'border-slate-200 dark:border-slate-700/60'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={() => handleStep(-1)}
+          disabled={stock <= 0 || isSaving}
+          title="Disminuir stock (-1)"
+          className="w-7 h-7 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 flex items-center justify-center transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-95 shadow-sm cursor-pointer"
+        >
+          <Minus size={13} strokeWidth={3} />
+        </button>
+
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={localValue}
+          disabled={isSaving}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onWheel={handleWheel}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          title="Tipea directo o usa la rueda del mouse para cambiar stock"
+          className={`w-16 text-center font-black text-base bg-transparent border-none outline-none py-0.5 focus:ring-2 focus:ring-blue-500/40 rounded-lg transition-colors ${
+            isLow ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'
+          }`}
+        />
+
+        <button
+          type="button"
+          onClick={() => handleStep(1)}
+          disabled={isSaving}
+          title="Aumentar stock (+1)"
+          className="w-7 h-7 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 flex items-center justify-center transition-all disabled:opacity-30 active:scale-95 shadow-sm cursor-pointer"
+        >
+          <Plus size={13} strokeWidth={3} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 px-1">
+        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+          Mín: {minStock}
+        </p>
+        {isLow && (
+          <span className="text-[9px] font-black text-red-500 bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded-md">
+            Bajo
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const Inventory: React.FC = () => {
   const { user } = useAuthStore();
@@ -555,15 +702,13 @@ const Inventory: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xl font-black ${product.stock <= product.minStock ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
-                        {product.stock}
-                      </span>
-                      {product.stock <= product.minStock && (
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Min: {product.minStock}</p>
+                    <InlineStockEditor
+                      productId={product.id}
+                      stock={product.stock}
+                      minStock={product.minStock}
+                      disabled={isEmployee}
+                      onUpdateStock={(id, newStock) => updateProduct(id, { stock: newStock })}
+                    />
                   </td>
                   {!isEmployee && (
                     <td className="px-8 py-5 text-right">
