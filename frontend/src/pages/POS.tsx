@@ -298,8 +298,8 @@ const POS: React.FC = () => {
         }));
       }
 
-      // 3. Parallelize database operations: Sale, SaleItems, Stock updates, and Customer balance
-      const saleInsertPromise = supabase
+      // 3. Insert Sale header first (required so SaleItem foreign key constraint is satisfied)
+      const { error: saleErr } = await supabase
         .from('Sale')
         .insert({
           id: newSaleId,
@@ -316,6 +316,9 @@ const POS: React.FC = () => {
           updatedAt: new Date().toISOString()
         });
 
+      if (saleErr) throw saleErr;
+
+      // 4. In parallel: insert SaleItems, update stock for all products, and update customer debt
       const itemsInsertPromise = supabase
         .from('SaleItem')
         .insert(cart.map(item => ({
@@ -351,16 +354,14 @@ const POS: React.FC = () => {
           })()
         : Promise.resolve();
 
-      // Wait for all DB writes concurrently in a single parallel roundtrip
-      const [saleRes, itemsRes] = await Promise.all([
-        saleInsertPromise,
+      // Wait for items, stock updates, and customer balance in parallel
+      const [itemsRes] = await Promise.all([
         itemsInsertPromise,
         ...stockUpdatePromises,
         customerUpdatePromise
       ]);
 
-      if (saleRes.error) throw saleRes.error;
-      if (itemsRes.error) throw itemsRes.error;
+      if (itemsRes && (itemsRes as any).error) throw (itemsRes as any).error;
 
       // 4. INSTANT TRANSITION: Open invoice & options modal immediately!
       setSaleId(newSaleId);
